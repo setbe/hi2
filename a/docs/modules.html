@@ -1,0 +1,185 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: Module Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">module map</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Overview</a>
+        <a href="modules.html">Modules</a>
+        <a href="api-atlas.html">API Atlas</a>
+        <a href="memory-model.html">Memory Model</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Crypto</a>
+        <a href="recipes.html">Recipes</a>
+        <a href="source/index.html">Source</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="modules.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="uk/modules.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Module Map</h1>
+      <p>A quick architectural map of <code>a/</code>: what each header owns and why it exists.</p>
+    </section>
+
+    <section class="section">
+      <h2>Core Headers</h2>
+      <table>
+        <thead><tr><th>Header</th><th>Role</th><th>Main Surface</th></tr></thead>
+        <tbody>
+          <tr><td><code>a/config.hpp</code></td><td>Compiler/arch/language feature detection</td><td>Macros: <code>A_COMPILER_*</code>, <code>A_ARCH_*</code>, <code>A_ENDIAN_*</code>, attributes/branch hints</td></tr>
+          <tr><td><code>a/profile.hpp</code></td><td>Contract profile policy</td><td><code>profile::level</code>, <code>profile::preset</code>, global <code>current_level</code></td></tr>
+          <tr><td><code>a/contract.hpp</code></td><td>Unified contract mechanism</td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>assume</code>, <code>assume_verified</code>, <code>unreachable</code></td></tr>
+          <tr><td><code>a/bounded.hpp</code></td><td>Constrained scalar value types</td><td><code>bounded&lt;T,Min,Max&gt;</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td></tr>
+          <tr><td><code>a/types.hpp</code></td><td>Fixed-width primitives</td><td><code>u8..u64</code>, <code>i8..i64</code>, <code>usize/isize</code>, <code>u128</code>, <code>npos</code></td></tr>
+          <tr><td><code>a/status.hpp</code></td><td>Status channel</td><td><code>enum class status</code>, <code>is_ok()</code></td></tr>
+          <tr><td><code>a/memory_requirements.hpp</code></td><td>Memory algebra primitives</td><td><code>memory_req</code>, <code>req_sum</code>, <code>req_max</code>, overflow/validation helpers</td></tr>
+          <tr><td><code>a/meta.hpp</code></td><td>Compile-time traits</td><td><code>enable_if</code>, <code>is_same</code>, <code>remove_reference</code>, nothrow traits</td></tr>
+          <tr><td><code>a/utility.hpp</code></td><td>Utility intrinsics</td><td><code>len</code>, <code>move</code>, <code>forward</code>, <code>launder_ptr</code></td></tr>
+          <tr><td><code>a/view.hpp</code></td><td>Non-owning views</td><td><code>view</code>, <code>view_n</code>, <code>char_view</code>, <code>byte_view</code>, <code>as_view</code></td></tr>
+          <tr><td><code>a/utf8.hpp</code></td><td>UTF-8 literal helpers</td><td><code>u8view</code>, macro <code>A_U8(...)</code></td></tr>
+          <tr><td><code>a/math.hpp</code></td><td>Integer math and helpers</td><td><code>mul_u64</code>, <code>add_u128</code>, <code>div_u64_u32</code>, <code>f2u8</code>, <code>ceil</code></td></tr>
+          <tr><td><code>a/bit.hpp</code></td><td>Endian/bit operations</td><td><code>byteswap</code>, <code>rotl/rotr</code>, <code>load/store le/be</code>, <code>bitset&lt;N&gt;</code></td></tr>
+          <tr><td><code>a/charconv_base.hpp</code></td><td>Minimal charconv helpers</td><td><code>digit_floor_clamped_0_9</code>, <code>digit_to_u32_from_double_pos</code>, <code>digit_to_double</code></td></tr>
+          <tr><td><code>a/arena.hpp</code></td><td>Arena + rollback scope</td><td><code>arena_view</code>, <code>alloc_result</code>, <code>scope</code></td></tr>
+          <tr><td><code>a/two_pass.hpp</code></td><td>Compile-time composition + typed scope</td><td><code>component_req</code>, <code>sum_req</code>, <code>layout</code>, <code>typed_scope</code>, <code>a::two_pass</code> wrappers</td></tr>
+          <tr><td><code>a/a.hpp</code></td><td>Umbrella include</td><td>Stable include order for all core headers</td></tr>
+        </tbody>
+      </table>
+      <p class="infobox"><strong>Contract rules:</strong> API boundaries use <code>require</code>; impossible paths use <code>unreachable</code>; optimizer hints belong to <code>assume_verified</code> after proof. See <code>a/CONTRACTS.md</code>.</p>
+    </section>
+
+    <section class="section">
+      <h2>Crypto Headers</h2>
+      <table>
+        <thead><tr><th>Header</th><th>Algorithm</th><th>Main API</th></tr></thead>
+        <tbody>
+          <tr><td><code>a/crypto/sha256.hpp</code></td><td>SHA-256 + HMAC</td><td><code>update</code>, <code>final</code>, <code>final_without_logical_reset</code>, static <code>hmac</code></td></tr>
+          <tr><td><code>a/crypto/sha384.hpp</code></td><td>SHA-384 + HMAC</td><td><code>update</code>, <code>final</code>, <code>final_without_logical_reset</code>, static <code>hmac</code></td></tr>
+          <tr><td><code>a/crypto/chacha20.hpp</code></td><td>ChaCha20 stream cipher</td><td><code>init</code>, <code>keystream</code>, <code>encrypt</code>, <code>encrypt_inplace</code>, <code>wipe</code></td></tr>
+          <tr><td><code>a/crypto/poly1305.hpp</code></td><td>Poly1305 MAC</td><td><code>init</code>, <code>update</code>, <code>final</code>, <code>ct_equal</code>, OTK helpers</td></tr>
+          <tr><td><code>a/crypto/aead_chacha20_poly1305.hpp</code></td><td>AEAD RFC 8439</td><td><code>seal</code>, <code>open</code>, <code>mac_rfc8439</code></td></tr>
+          <tr><td><code>a/crypto/x25519.hpp</code></td><td>X25519 ECDH</td><td><code>generate_public</code>, <code>shared_secret</code>, <code>ct_equal32</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Internal Headers</h2>
+      <div class="grid">
+        <article class="card">
+          <h3><code>a/detail/arch.hpp</code></h3>
+          <p class="muted">Arch tags and <code>arch_default</code> selection for internal fast-path policy.</p>
+        </article>
+        <article class="card">
+          <h3><code>a/crypto/detail/load_store.hpp</code></h3>
+          <p class="muted">LE/BE load-store helpers for crypto modules, built on <code>a::bit</code>.</p>
+        </article>
+        <article class="card">
+          <h3><code>a/crypto/detail/ct.hpp</code></h3>
+          <p class="muted">Constant-time compare helpers: <code>ct_equal_n</code> and <code>ct_equal</code>.</p>
+        </article>
+        <article class="card">
+          <h3><code>a/crypto/detail/wipe.hpp</code></h3>
+          <p class="muted">Best-effort secret wipe via volatile byte loop.</p>
+        </article>
+      </div>
+    </section>
+
+    <footer class="foot">
+      Module map for the full <code>a/</code> subrepo.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,639 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: two_pass.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">source</span>
+      </div>
+      <nav class="nav">
+        <a href="../index.html">Overview</a>
+        <a href="../modules.html">Modules</a>
+        <a href="../api-atlas.html">API Atlas</a>
+        <a href="index.html">Source Index</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="two_pass.hpp.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="../uk/source/two_pass.hpp.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>two_pass.hpp</h1>
+      <p><span class="pill ok">public</span></p>
+      <p class="src-path">Path: <code>a/two_pass.hpp</code></p>
+    </section>
+    <section class="section">
+      <div class="code"><pre><code>#pragma once
+
+#include &quot;arena.hpp&quot;
+#include &quot;bit.hpp&quot;
+#include &quot;meta.hpp&quot;
+#include &quot;memory_requirements.hpp&quot;
+#include &quot;status.hpp&quot;
+#include &quot;types.hpp&quot;
+#include &quot;utility.hpp&quot;
+#include &lt;new&gt;
+
+namespace a {
+// Default component contract: Component::requirement().
+// For more advanced specs, specialize component_req&lt;T&gt;.
+template&lt;typename Component&gt;
+struct component_req {
+    static constexpr memory_req value = Component::requirement();
+
+    A_NODISCARD static constexpr memory_req requirement() noexcept {
+        return value;
+    }
+};
+
+namespace detail {
+template&lt;typename T, typename... Components&gt;
+struct count_type;
+
+template&lt;typename T&gt;
+struct count_type&lt;T&gt; {
+    static A_CONSTEXPR_VAR usize value = 0;
+};
+
+template&lt;typename T, typename Head, typename... Tail&gt;
+struct count_type&lt;T, Head, Tail...&gt; {
+    static A_CONSTEXPR_VAR usize value =
+        (is_same&lt;T, Head&gt;::value ? 1u : 0u) + count_type&lt;T, Tail...&gt;::value;
+};
+
+template&lt;typename... Components&gt;
+struct all_unique;
+
+template&lt;&gt;
+struct all_unique&lt;&gt; {
+    static A_CONSTEXPR_VAR bool value = true;
+};
+
+template&lt;typename Head, typename... Tail&gt;
+struct all_unique&lt;Head, Tail...&gt; {
+    static A_CONSTEXPR_VAR bool value =
+        (count_type&lt;Head, Tail...&gt;::value == 0) &amp;&amp; all_unique&lt;Tail...&gt;::value;
+};
+
+template&lt;typename... Components&gt;
+struct all_nothrow_destructible;
+
+template&lt;&gt;
+struct all_nothrow_destructible&lt;&gt; {
+    static A_CONSTEXPR_VAR bool value = true;
+};
+
+template&lt;typename Head, typename... Tail&gt;
+struct all_nothrow_destructible&lt;Head, Tail...&gt; {
+    static A_CONSTEXPR_VAR bool value =
+        is_nothrow_destructible_v&lt;Head&gt; &amp;&amp; all_nothrow_destructible&lt;Tail...&gt;::value;
+};
+
+template&lt;typename T, usize Index, typename... Components&gt;
+struct index_type;
+
+template&lt;typename T, usize Index&gt;
+struct index_type&lt;T, Index&gt; {
+    static A_CONSTEXPR_VAR usize value = req_overflow_bytes;
+};
+
+template&lt;typename T, usize Index, typename Head, typename... Tail&gt;
+struct index_type&lt;T, Index, Head, Tail...&gt; {
+    static A_CONSTEXPR_VAR usize value =
+        is_same&lt;T, Head&gt;::value ? Index : index_type&lt;T, Index + 1, Tail...&gt;::value;
+};
+} // namespace detail
+
+template&lt;typename... Components&gt;
+struct max_req;
+
+template&lt;typename First&gt;
+struct max_req&lt;First&gt; {
+    static constexpr memory_req value = component_req&lt;First&gt;::value;
+
+    A_NODISCARD static constexpr memory_req requirement() noexcept {
+        return value;
+    }
+};
+
+template&lt;typename First, typename Second, typename... Rest&gt;
+struct max_req&lt;First, Second, Rest...&gt; {
+    static constexpr memory_req value =
+        req_max(component_req&lt;First&gt;::value, max_req&lt;Second, Rest...&gt;::value);
+
+    A_NODISCARD static constexpr memory_req requirement() noexcept {
+        return value;
+    }
+};
+
+template&lt;typename... Components&gt;
+struct sum_req;
+
+template&lt;typename First&gt;
+struct sum_req&lt;First&gt; {
+    static constexpr memory_req value = component_req&lt;First&gt;::value;
+
+    A_NODISCARD static constexpr memory_req requirement() noexcept {
+        return value;
+    }
+};
+
+template&lt;typename First, typename Second, typename... Rest&gt;
+struct sum_req&lt;First, Second, Rest...&gt; {
+private:
+    template&lt;typename Next&gt;
+    A_NODISCARD static constexpr memory_req fold(memory_req acc) noexcept {
+        return req_sum(acc, component_req&lt;Next&gt;::value);
+    }
+
+    template&lt;typename Next, typename Next2, typename... Tail&gt;
+    A_NODISCARD static constexpr memory_req fold(memory_req acc) noexcept {
+        return fold&lt;Next2, Tail...&gt;(req_sum(acc, component_req&lt;Next&gt;::value));
+    }
+
+public:
+    static constexpr memory_req value = fold&lt;Second, Rest...&gt;(component_req&lt;First&gt;::value);
+
+    A_NODISCARD static constexpr memory_req requirement() noexcept {
+        return value;
+    }
+};
+
+namespace detail {
+template&lt;typename Target, usize Offset, typename... Components&gt;
+struct layout_offset;
+
+template&lt;typename Target, usize Offset&gt;
+struct layout_offset&lt;Target, Offset&gt; {
+    A_NODISCARD static constexpr usize value() noexcept {
+        return req_overflow_bytes;
+    }
+};
+
+template&lt;typename Target, usize Offset, typename Head, typename... Tail&gt;
+struct layout_offset&lt;Target, Offset, Head, Tail...&gt; {
+    A_NODISCARD static constexpr memory_req head_req() noexcept {
+        return component_req&lt;Head&gt;::value;
+    }
+
+    A_NODISCARD static constexpr usize head_offset() noexcept {
+        return align_up(Offset, head_req().align);
+    }
+
+    A_NODISCARD static constexpr usize next_offset() noexcept {
+        return req_sum(memory_req{Offset, 1}, head_req()).bytes;
+    }
+
+    A_NODISCARD static constexpr usize value() noexcept {
+        return is_same&lt;Target, Head&gt;::value ? head_offset()
+                                            : layout_offset&lt;Target, next_offset(), Tail...&gt;::value();
+    }
+};
+} // namespace detail
+
+template&lt;typename... Components&gt;
+struct layout {
+    static_assert(sizeof...(Components) &gt; 0, &quot;layout: at least one component is required&quot;);
+    static_assert(detail::all_unique&lt;Components...&gt;::value,
+                  &quot;layout: duplicate component type is not allowed&quot;);
+
+    static A_CONSTEXPR_VAR usize component_count = sizeof...(Components);
+    static A_CONSTEXPR_VAR bool all_components_nothrow_destructible =
+        detail::all_nothrow_destructible&lt;Components...&gt;::value;
+    static constexpr memory_req value = sum_req&lt;Components...&gt;::value;
+    static_assert(is_valid(value), &quot;layout: invalid requirement (align/overflow)&quot;);
+    static_assert(!is_overflow(value), &quot;layout: requirement overflow&quot;);
+
+    A_NODISCARD static constexpr memory_req requirement() noexcept {
+        return value;
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD static constexpr bool has_component() noexcept {
+        return detail::count_type&lt;T, Components...&gt;::value == 1;
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD static constexpr usize index_of() noexcept {
+        static_assert(has_component&lt;T&gt;(),
+                      &quot;layout::index_of&lt;T&gt;: T must appear exactly once in Components...&quot;);
+        constexpr usize idx = detail::index_type&lt;T, 0, Components...&gt;::value;
+        static_assert(idx != req_overflow_bytes, &quot;layout::index_of&lt;T&gt;: invalid index&quot;);
+        return idx;
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD static constexpr usize offset_of() noexcept {
+        static_assert(has_component&lt;T&gt;(),
+                      &quot;layout::offset_of&lt;T&gt;: T must appear exactly once in Components...&quot;);
+        constexpr usize off = detail::layout_offset&lt;T, 0, Components...&gt;::value();
+        static_assert(off != req_overflow_bytes, &quot;layout::offset_of&lt;T&gt;: invalid offset&quot;);
+        return off;
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD static T* ptr(void* base) noexcept {
+        constexpr usize off = offset_of&lt;T&gt;();
+        static_assert(off != req_overflow_bytes, &quot;layout::ptr&lt;T&gt;: invalid offset&quot;);
+        // Raw slot pointer only. Object lifetime is managed by typed_scope::construct/destroy.
+        return a::launder_ptr(reinterpret_cast&lt;T*&gt;(static_cast&lt;a::u8*&gt;(base) + off));
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD static const T* ptr(const void* base) noexcept {
+        constexpr usize off = offset_of&lt;T&gt;();
+        static_assert(off != req_overflow_bytes, &quot;layout::ptr&lt;T&gt;: invalid offset&quot;);
+        return a::launder_ptr(reinterpret_cast&lt;const T*&gt;(static_cast&lt;const a::u8*&gt;(base) + off));
+    }
+
+private:
+    template&lt;usize Index&gt;
+    static void destroy_constructed_impl(void*, bitset&lt;component_count&gt;&amp;) noexcept {}
+
+    template&lt;usize Index, typename Head, typename... Tail&gt;
+    static void destroy_constructed_impl(void* base, bitset&lt;component_count&gt;&amp; flags) noexcept {
+        destroy_constructed_impl&lt;Index + 1, Tail...&gt;(base, flags);
+        if (flags.test(Index)) {
+            ptr&lt;Head&gt;(base)-&gt;~Head();
+            flags.reset(Index);
+        }
+    }
+
+public:
+    static void destroy_constructed(void* base, bitset&lt;component_count&gt;&amp; flags) noexcept {
+        if (base == nullptr) {
+            return;
+        }
+        destroy_constructed_impl&lt;0, Components...&gt;(base, flags);
+    }
+};
+
+template&lt;typename... Components&gt;
+struct scope_spec {
+    using layout_type = layout&lt;Components...&gt;;
+    static constexpr memory_req value = layout_type::value;
+    static_assert(is_valid(value), &quot;scope_spec: invalid requirement&quot;);
+    static_assert(!is_overflow(value), &quot;scope_spec: requirement overflow&quot;);
+
+    A_NODISCARD static constexpr memory_req requirement() noexcept {
+        return value;
+    }
+};
+
+template&lt;typename Layout&gt;
+struct typed_scope {
+    static_assert(Layout::component_count &gt; 0, &quot;typed_scope: layout must contain at least one component&quot;);
+    static_assert(Layout::all_components_nothrow_destructible,
+                  &quot;typed_scope: all layout components must be nothrow-destructible&quot;);
+    static_assert(is_valid(Layout::requirement()), &quot;typed_scope: invalid layout requirement&quot;);
+    static_assert(!is_overflow(Layout::requirement()), &quot;typed_scope: layout requirement overflow&quot;);
+
+    a::scope frame;
+    void* base = nullptr;
+    // Initialization status only (from ctor allocation/validation path).
+    // Usability is defined by is_alive(), not by init_status().
+    status init_code = status::ok;
+    bool alive = false;
+    bitset&lt;Layout::component_count&gt; constructed{};
+
+    explicit typed_scope(arena_view&amp; arena) noexcept
+        : frame(arena) {
+        const memory_req req = Layout::requirement();
+        if (!is_valid(req) || is_overflow(req)) {
+            init_code = status::overflow;
+            alive = false;
+            return;
+        }
+        const alloc_result r = arena.alloc(req.bytes, req.align);
+        base = r.ptr;
+        init_code = r.code;
+        alive = (base != nullptr) &amp;&amp; is_ok(init_code);
+    }
+
+    typed_scope(const typed_scope&amp;) = delete;
+    typed_scope&amp; operator=(const typed_scope&amp;) = delete;
+
+    typed_scope(typed_scope&amp;&amp; other) noexcept
+        : frame(a::move(other.frame)), base(other.base), init_code(other.init_code), alive(other.alive) {
+        constructed = other.constructed;
+        other.make_inert();
+    }
+
+    typed_scope&amp; operator=(typed_scope&amp;&amp; other) noexcept {
+        if (this == &amp;other) {
+            return *this;
+        }
+
+        // Destructive move: current constructed objects are destroyed before takeover.
+        destroy_all();
+
+        frame = a::move(other.frame);
+        base = other.base;
+        init_code = other.init_code;
+        alive = other.alive;
+        constructed = other.constructed;
+        other.make_inert();
+        return *this;
+    }
+
+    ~typed_scope() noexcept {
+        destroy_all();
+    }
+
+    A_NODISCARD static constexpr memory_req requirement() noexcept {
+        return Layout::requirement();
+    }
+
+    // Usability check. `init_status()==ok` alone is not sufficient; inert scopes return false.
+    A_NODISCARD A_CONSTEXPR explicit operator bool() const noexcept {
+        return is_alive();
+    }
+
+    A_NODISCARD status init_status() const noexcept { return init_code; }
+    A_NODISCARD bool active() const noexcept { return is_alive(); }
+
+    template&lt;typename T&gt;
+    A_NODISCARD bool is_constructed() const noexcept {
+        static_assert(Layout::template has_component&lt;T&gt;(),
+                      &quot;typed_scope::is_constructed&lt;T&gt;: T must belong to Layout&quot;);
+        if (!is_alive()) {
+            return false;
+        }
+        const usize idx = Layout::template index_of&lt;T&gt;();
+        return constructed.test(idx);
+    }
+
+    A_NODISCARD usize constructed_count() const noexcept {
+        return constructed.count();
+    }
+
+    // Raw storage slot (no lifetime guarantee).
+    template&lt;typename T&gt;
+    A_NODISCARD T* slot() noexcept {
+        static_assert(Layout::template has_component&lt;T&gt;(),
+                      &quot;typed_scope::slot&lt;T&gt;: T must belong to Layout&quot;);
+        if (!is_alive()) {
+            return nullptr;
+        }
+        return Layout::template ptr&lt;T&gt;(base);
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD const T* slot() const noexcept {
+        static_assert(Layout::template has_component&lt;T&gt;(),
+                      &quot;typed_scope::slot&lt;T&gt;: T must belong to Layout&quot;);
+        if (!is_alive()) {
+            return nullptr;
+        }
+        return Layout::template ptr&lt;T&gt;(base);
+    }
+
+    // Constructed object view. Returns nullptr when object lifetime was not started.
+    template&lt;typename T&gt;
+    A_NODISCARD T* get() noexcept {
+        static_assert(Layout::template has_component&lt;T&gt;(),
+                      &quot;typed_scope::get&lt;T&gt;: T must belong to Layout&quot;);
+        const usize idx = Layout::template index_of&lt;T&gt;();
+        return (is_alive() &amp;&amp; constructed.test(idx)) ? Layout::template ptr&lt;T&gt;(base) : nullptr;
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD const T* get() const noexcept {
+        static_assert(Layout::template has_component&lt;T&gt;(),
+                      &quot;typed_scope::get&lt;T&gt;: T must belong to Layout&quot;);
+        const usize idx = Layout::template index_of&lt;T&gt;();
+        return (is_alive() &amp;&amp; constructed.test(idx)) ? Layout::template ptr&lt;T&gt;(base) : nullptr;
+    }
+
+    template&lt;typename T, typename... Args&gt;
+    A_NODISCARD T* construct(Args&amp;&amp;... args) noexcept {
+        static_assert(is_nothrow_destructible_v&lt;T&gt;,
+                      &quot;typed_scope::construct&lt;T&gt;: T must be nothrow-destructible&quot;);
+        static_assert(is_nothrow_constructible_v&lt;T, Args...&gt;,
+                      &quot;typed_scope::construct&lt;T&gt;: T must be nothrow-constructible for Args...&quot;);
+        static_assert(Layout::template has_component&lt;T&gt;(),
+                      &quot;typed_scope::construct&lt;T&gt;: T must belong to Layout&quot;);
+
+        T* p = slot&lt;T&gt;();
+        if (p == nullptr) {
+            return nullptr;
+        }
+        const usize idx = Layout::template index_of&lt;T&gt;();
+        if (constructed.test(idx)) {
+            return nullptr;
+        }
+        T* obj = ::new (static_cast&lt;void*&gt;(p)) T(a::forward&lt;Args&gt;(args)...);
+        constructed.set(idx);
+        return obj;
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD bool destroy() noexcept {
+        static_assert(is_nothrow_destructible_v&lt;T&gt;,
+                      &quot;typed_scope::destroy&lt;T&gt;: T must be nothrow-destructible&quot;);
+        static_assert(Layout::template has_component&lt;T&gt;(),
+                      &quot;typed_scope::destroy&lt;T&gt;: T must belong to Layout&quot;);
+
+        T* p = slot&lt;T&gt;();
+        if (p == nullptr) {
+            return false;
+        }
+        const usize idx = Layout::template index_of&lt;T&gt;();
+        if (!constructed.test(idx)) {
+            return false;
+        }
+        p-&gt;~T();
+        constructed.reset(idx);
+        return true;
+    }
+
+    // Cleanup-only: destroys constructed objects, but keeps storage open.
+    // Use `release()` to close the scope and make it inert.
+    void destroy_all() noexcept {
+        // Allowed in error state: this is a cleanup path, not a usage path.
+        if (base == nullptr) {
+            return;
+        }
+        Layout::destroy_constructed(base, constructed);
+    }
+
+    A_NODISCARD bool release() noexcept {
+        if (!is_alive()) {
+            return false;
+        }
+        if (constructed.any()) {
+            destroy_all();
+        }
+        frame.release();
+        make_inert();
+        return true;
+    }
+
+    // Unsafe escape hatch: bypasses slot/get lifetime discipline.
+    A_NODISCARD void* data() noexcept { return base; }
+    A_NODISCARD const void* data() const noexcept { return base; }
+
+private:
+    A_NODISCARD bool is_alive() const noexcept {
+        return alive &amp;&amp; (base != nullptr) &amp;&amp; is_ok(init_code);
+    }
+
+    void make_inert() noexcept {
+        // Invariant: inert =&gt; no base storage and no constructed objects.
+        frame.release();
+        base = nullptr;
+        alive = false;
+        constructed.clear();
+    }
+};
+
+namespace two_pass {
+template&lt;typename Plan&gt;
+struct plan_result {
+    status code = status::ok;
+    Plan plan{};
+    memory_req memory{};
+
+    A_NODISCARD A_CONSTEXPR explicit operator bool() const noexcept {
+        return code == status::ok;
+    }
+};
+
+template&lt;typename Output&gt;
+struct build_result {
+    status code = status::ok;
+    Output value{};
+
+    A_NODISCARD A_CONSTEXPR explicit operator bool() const noexcept {
+        return code == status::ok;
+    }
+};
+
+template&lt;&gt;
+struct build_result&lt;void&gt; {
+    status code = status::ok;
+
+    A_NODISCARD A_CONSTEXPR explicit operator bool() const noexcept {
+        return code == status::ok;
+    }
+};
+
+template&lt;typename Plan, typename Input&gt;
+struct traits;
+
+template&lt;usize Bytes, usize Align = 1&gt;
+struct static_req {
+    static_assert(Bytes &gt; 0, &quot;static_req: bytes must be &gt; 0&quot;);
+    static_assert(is_power_of_two(Align), &quot;static_req: align must be power-of-two&quot;);
+    static constexpr memory_req value = memory_req{Bytes, Align};
+
+    A_NODISCARD static constexpr memory_req requirement() noexcept {
+        return value;
+    }
+};
+
+template&lt;typename Component&gt; struct component_req : a::component_req&lt;Component&gt; {};
+template&lt;typename... Components&gt; struct max_req : a::max_req&lt;Components...&gt; {};
+template&lt;typename... Components&gt; struct sum_req : a::sum_req&lt;Components...&gt; {};
+template&lt;typename... Components&gt; struct layout : a::layout&lt;Components...&gt; {};
+template&lt;typename... Components&gt;
+struct scope : a::typed_scope&lt;a::layout&lt;Components...&gt;&gt; {
+    using base = a::typed_scope&lt;a::layout&lt;Components...&gt;&gt;;
+    explicit scope(arena_view&amp; arena) noexcept : base(arena) {}
+};
+} // namespace two_pass
+} // namespace a
+</code></pre></div>
+    </section>
+    <footer class="foot">
+      <a href="index.html">Back to Source Index</a>
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+

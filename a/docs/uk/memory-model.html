@@ -1,0 +1,229 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: Memory Model</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">memory model</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Огляд</a>
+        <a href="modules.html">Модулі</a>
+        <a href="api-atlas.html">API Атлас</a>
+        <a href="memory-model.html">Модель Пам'яті</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Крипто</a>
+        <a href="recipes.html">Рецепти</a>
+        <a href="source/index.html">Код</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag" href="../memory-model.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag active" href="memory-model.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Deterministic Memory Model</h1>
+      <p>
+        У <code>a::</code> пам'ять не "магічна": спершу формулюємо контракт,
+        далі даємо реальний буфер і працюємо строго в його межах.
+        Такий підхід робить поведінку передбачуваною навіть у найжорсткіших bare-metal сценаріях.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Primitives</h2>
+      <table>
+        <thead><tr><th>Entity</th><th>Purpose</th><th>File</th></tr></thead>
+        <tbody>
+          <tr><td><code>a::memory_req</code></td><td>Базовий контракт <code>{bytes, align}</code></td><td><code>a/memory_requirements.hpp</code></td></tr>
+          <tr><td><code>a::req_sum</code></td><td>Packed composition з alignment (sum semantics)</td><td><code>a/memory_requirements.hpp</code></td></tr>
+          <tr><td><code>a::req_max</code></td><td>Peak reusable region (max semantics)</td><td><code>a/memory_requirements.hpp</code></td></tr>
+          <tr><td><code>a::arena_view</code></td><td>Non-owning arena allocation cursor</td><td><code>a/arena.hpp</code></td></tr>
+          <tr><td><code>a::scope</code></td><td>RAII rewind frame (mark/rollback)</td><td><code>a/arena.hpp</code></td></tr>
+          <tr><td><code>a::typed_scope&lt;Layout&gt;</code></td><td>Type-composed slots + construction tracking</td><td><code>a/two_pass.hpp</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>sum vs max</h2>
+      <div class="grid">
+        <article class="card">
+          <h3><code>req_sum(a,b)</code></h3>
+          <p class="muted">Коли компоненти мають жити одночасно в одному layout.</p>
+          <div class="code"><pre><code>start_b = align_up(a.bytes, b.align)
+result.bytes = start_b + b.bytes
+result.align = max(a.align, b.align)</code></pre></div>
+      <p class='code-note'>Ця формула вирівнює другий компонент, додає його байти та зберігає найсуворіше вирівнювання для всього packed layout.<br><strong>На пальцях:</strong> якщо перший блок закінчився на байті 20, а другому треба align 16, другий стартує з 32, а не з 21.</p>
+        </article>
+        <article class="card">
+          <h3><code>req_max(a,b)</code></h3>
+          <p class="muted">Коли фази взаємовиключні й arena перевикористовується.</p>
+          <div class="code"><pre><code>result.bytes = max(a.bytes, b.bytes)
+result.align = max(a.align, b.align)</code></pre></div>
+      <p class='code-note'>Ця формула не пакує компоненти разом; вона рахує піковий reusable region для взаємовиключних фаз.<br><strong>На пальцях:</strong> якщо boot просить 96 КБ, а runtime 40 КБ, загалом треба лише 96 КБ.</p>
+        </article>
+      </div>
+      <p class="infobox"><strong>Правило:</strong> <code>sum</code> для співіснування, <code>max</code> для взаємовиключних фаз.</p>
+      <img class="infographic" src="../assets/sum-vs-max.svg" alt="sum vs max semantics">
+    </section>
+
+    <section class="section">
+      <h2>Compile-Time Composition by Types</h2>
+      <div class="code"><pre><code>struct font_phase {
+    static constexpr a::memory_req requirement() noexcept { return {32 * 1024, 16}; }
+};
+
+struct image_phase {
+    static constexpr a::memory_req requirement() noexcept { return {96 * 1024, 16}; }
+};
+
+using load_layout = a::layout&lt;font_phase, image_phase&gt;;
+constexpr a::memory_req load_req = load_layout::requirement();
+
+using boot_req = a::sum_req&lt;font_phase, image_phase&gt;;
+using runtime_req = a::max_req&lt;font_phase, image_phase&gt;;</code></pre></div>
+      <p class='code-note'>У прикладі контракти пам'яті задаються на рівні типів: кожен тип має <code>requirement()</code>, а композиція виконується на compile-time.<br><strong>На пальцях:</strong> тип <code>font_phase</code> каже "32 КБ", <code>image_phase</code> каже "96 КБ", а компілятор одразу знає суму.</p>
+    </section>
+
+    <section class="section">
+      <h2>typed_scope Lifecycle Rules</h2>
+      <ul>
+        <li><code>active()</code> визначає, чи scope usable; <code>init_status()</code> зберігає лише результат старту.</li>
+        <li><code>slot&lt;T&gt;()</code> дає raw storage slot, без старту lifetime.</li>
+        <li><code>construct&lt;T&gt;()</code> запускає lifetime через placement new і фіксує constructed-стан.</li>
+        <li><code>destroy&lt;T&gt;()</code> руйнує лише реально сконструйований об'єкт.</li>
+        <li><code>destroy_all()</code> чистить об'єкти, але не закриває scope.</li>
+        <li><code>release()</code> закриває frame, звільняє lifetime і робить scope inert.</li>
+        <li><code>data()</code> — свідомий unsafe escape hatch, який обходить safety-дисципліну.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Правила Вибору Контракту</h2>
+      <table>
+        <thead><tr><th>Rule</th><th>Use</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td><code>require(cond)</code></td><td>Передумова на API/caller межі</td><td><code>require(bytes &gt; 0)</code> перед алокацією</td></tr>
+          <tr><td><code>ensure(cond)</code></td><td>Постумова після операції</td><td><code>ensure(offset &lt;= size)</code> після оновлення</td></tr>
+          <tr><td><code>invariant(cond)</code></td><td>Внутрішнє правило консистентності</td><td><code>invariant(mark &lt;= size)</code></td></tr>
+          <tr><td><code>assume(cond)</code></td><td>Перевірене припущення + optional optimizer hint</td><td>Гарячий внутрішній шлях зі strict-контрактом</td></tr>
+          <tr><td><code>assume_verified(cond)</code></td><td>Після попереднього доведення/перевірки цієї ж умови</td><td>Fast path після <code>require(is_pow2(align))</code></td></tr>
+          <tr><td><code>unreachable()</code></td><td>Неможливий control-flow шлях</td><td><code>default:</code> неможлива enum-гілка</td></tr>
+        </tbody>
+      </table>
+      <p class="infobox"><strong>Bounded-значення:</strong> розміри/count/alignment краще моделювати через <code>a::bounded</code> і <code>a::pow2_bounded</code>, щоб валідація відбувалась у момент конструювання типу.</p>
+    </section>
+
+    <section class="section">
+      <h2>Context Strategy</h2>
+      <p>У практичних системах зазвичай працює двошаровий підхід:</p>
+      <ul>
+        <li><code>sum_req</code>/<code>layout</code> для локальних одночасно живих компонентів;</li>
+        <li><code>max_req</code> для глобального peak між взаємовиключними контекстами.</li>
+      </ul>
+      <div class="code"><pre><code>using boot = a::sum_req&lt;font_phase, image_phase&gt;;
+using game = a::sum_req&lt;renderer_state, ui_state&gt;;
+using app_peak = a::max_req&lt;boot, game&gt;;</code></pre></div>
+      <p class='code-note'>Цей патерн ділить локальні одночасні layout-и (<code>sum_req</code>) і глобальне пікове планування (<code>max_req</code>) для детермінованого reuse.<br><strong>На пальцях:</strong> всередині однієї фази складаєш блоки, між різними фазами береш просто більший пік.</p>
+    </section>
+
+    <footer class="foot">
+      Далі: <a href="two-pass-guide.html">Two Pass Guide</a> та <a href="recipes.html">Рецепти</a>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+

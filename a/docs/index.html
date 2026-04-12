@@ -1,0 +1,243 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">bare-metal docs</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Overview</a>
+        <a href="modules.html">Modules</a>
+        <a href="api-atlas.html">API Atlas</a>
+        <a href="memory-model.html">Memory Model</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Crypto</a>
+        <a href="recipes.html">Recipes</a>
+        <a href="source/index.html">Source</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="index.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="uk/index.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Documentation for <code>a/</code> and the public <code>a::</code> API</h1>
+      <p>
+        This site is a full guide to layer <code>a</code>: foundational modules, memory algebra,
+        <code>typed_scope</code> lifecycle contracts, <code>a::crypto</code>, and direct links to source.
+      </p>
+    </section>
+
+    <section class="section">
+      <div class="grid">
+        <article class="card">
+          <h3>Freestanding Core</h3>
+          <p class="muted">Types, metaprogramming and low-level utilities without platform coupling.</p>
+          <p><span class="pill ok">No OS includes</span> <span class="pill ok">Deterministic</span></p>
+        </article>
+        <article class="card">
+          <h3>Deterministic Memory</h3>
+          <p class="muted"><code>memory_req</code>, <code>req_sum/req_max</code>, <code>arena_view</code>, <code>scope</code>, <code>typed_scope</code>.</p>
+          <p><span class="pill warn">Unsafe hatch: data()</span></p>
+        </article>
+        <article class="card">
+          <h3>Crypto in a::crypto</h3>
+          <p class="muted">SHA-256/384, ChaCha20, Poly1305, AEAD, X25519 with caller-owned buffers.</p>
+          <p><span class="pill ok">No hidden heap</span></p>
+        </article>
+        <article class="card">
+          <h3>Contracts + Bounded Values</h3>
+          <p class="muted"><code>profile.hpp</code>, <code>contract.hpp</code>, <code>bounded.hpp</code> for explicit correctness and constrained value types.</p>
+          <p><span class="pill ok">Hard-fail contracts</span> <span class="pill ok">Range-safe types</span></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Quick Start</h2>
+      <div class="code"><pre><code>#include "a/a.hpp"
+
+struct font_scratch {
+    static constexpr a::memory_req requirement() noexcept { return {32 * 1024, 16}; }
+};
+
+struct image_scratch {
+    static constexpr a::memory_req requirement() noexcept { return {64 * 1024, 16}; }
+};
+
+using decode_layout = a::layout&lt;font_scratch, image_scratch&gt;;
+
+void run(a::arena_view arena) {
+    a::typed_scope&lt;decode_layout&gt; scope(arena);
+    if (!scope.active()) {
+        return;
+    }
+
+    auto* font_mem = scope.slot&lt;font_scratch&gt;();
+    auto* image_mem = scope.slot&lt;image_scratch&gt;();
+    (void)font_mem;
+    (void)image_mem;
+
+    scope.release();
+}</code></pre></div>
+      <p class='code-note'>What this snippet does: defines two compile-time components, builds a typed layout, maps slots from caller-provided arena memory, and closes the lifetime with <code>release()</code>.<br><strong>Plain example:</strong> you reserve one fixed buffer at startup, place font scratch and image scratch inside it, use them, then release the frame.</p>
+    </section>
+
+    <section class="section">
+      <h2>Reading Tracks</h2>
+      <div class="grid">
+        <article class="card">
+          <h3><a href="modules.html">Module Map</a></h3>
+          <p class="muted">Understand the structure fast: who owns what and where layer boundaries are.</p>
+        </article>
+        <article class="card">
+          <h3><a href="api-atlas.html">API Atlas</a></h3>
+          <p class="muted">A compact map of public types, functions, and key invariants.</p>
+        </article>
+        <article class="card">
+          <h3><a href="memory-model.html">Memory Model</a></h3>
+          <p class="muted">Practical logic for <code>req_sum</code>/<code>req_max</code>, layout offsets, and arena lifetimes.</p>
+        </article>
+        <article class="card">
+          <h3><a href="two-pass-guide.html">Two Pass Guide</a></h3>
+          <p class="muted">How to design <code>plan/build</code> modules with strict memory contracts.</p>
+        </article>
+        <article class="card">
+          <h3><a href="crypto-guide.html">Crypto Guide</a></h3>
+          <p class="muted">Algorithms, usage patterns, and practical safety rules.</p>
+        </article>
+        <article class="card">
+          <h3><a href="recipes.html">Recipes</a></h3>
+          <p class="muted">Ready-to-use templates for context memory and typed construction.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Infographic: Layers and Dependencies</h2>
+      <img class="infographic" src="assets/architecture.svg" alt="a namespace architecture">
+    </section>
+
+    <section class="section">
+      <h2>Infographic: typed_scope Lifecycle</h2>
+      <img class="infographic" src="assets/typed-scope-lifecycle.svg" alt="typed_scope lifecycle">
+      <p class="infobox">
+        <strong>Important:</strong> <code>init_status()==ok</code> does not mean a scope is still usable.
+        Check <code>active()</code> or <code>operator bool()</code>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Infographic: req_sum vs req_max</h2>
+      <img class="infographic" src="assets/sum-vs-max.svg" alt="sum vs max memory semantics">
+    </section>
+
+    <section class="section">
+      <h2>Source Reference</h2>
+      <p>
+        For exact API wording, open
+        <a href="source/index.html">Source Reference</a> and inspect the headers directly.
+      </p>
+      <p>
+        Contract usage quick rules are summarized in
+        <a href="../CONTRACTS.md">a/CONTRACTS.md</a>.
+      </p>
+    </section>
+
+    <footer class="foot">
+      Static docs for repository <code>a/</code>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
+

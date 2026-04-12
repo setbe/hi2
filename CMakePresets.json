@@ -1,0 +1,73 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "win64",
+      "displayName": "Windows x64",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "LEGACY_CPP14": "ON",
+        "ABCD_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "win32",
+      "displayName": "Windows x86",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "Win32",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "LEGACY_CPP14": "ON",
+        "ABCD_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "l",
+      "displayName": "Linux/Host x64 (Ninja Multi-Config)",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build/l",
+      "cacheVariables": {
+        "LEGACY_CPP14": "ON",
+        "ABCD_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "l32",
+      "displayName": "Linux/Host x86 (32-bit)",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build/l32",
+      "cacheVariables": {
+        "LEGACY_CPP14": "ON",
+        "ABCD_BUILD_TESTS": "ON",
+        "CMAKE_CXX_FLAGS": "-m32",
+        "CMAKE_EXE_LINKER_FLAGS": "-m32"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "l-d", "configurePreset": "l", "configuration": "Debug" },
+    { "name": "l-rel", "configurePreset": "l", "configuration": "Release" },
+    { "name": "l32-d", "configurePreset": "l32", "configuration": "Debug" },
+    { "name": "l32-rel", "configurePreset": "l32", "configuration": "Release" }
+  ],
+  "testPresets": [
+    {
+      "name": "l-d",
+      "configurePreset": "l",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "l-rel",
+      "configurePreset": "l",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

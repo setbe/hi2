@@ -1,0 +1,188 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: memory_requirements.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">source</span>
+      </div>
+      <nav class="nav">
+        <a href="../index.html">Огляд</a>
+        <a href="../modules.html">Модулі</a>
+        <a href="../api-atlas.html">API Атлас</a>
+        <a href="index.html">Індекс Коду</a>
+      </nav>      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag" href="../../source/memory_requirements.hpp.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag active" href="memory_requirements.hpp.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>memory_requirements.hpp</h1>
+      <p><span class="pill ok">public</span></p>
+      <p class="src-path">Path: <code>a/memory_requirements.hpp</code></p>
+    </section>
+    <section class="section">
+      <div class="code"><pre><code>#pragma once
+
+#include &quot;config.hpp&quot;
+#include &quot;types.hpp&quot;
+
+namespace a {
+struct memory_req {
+    usize bytes = 0;
+    usize align = 1;
+};
+
+static A_CONSTEXPR_VAR usize req_overflow_bytes = static_cast&lt;usize&gt;(-1);
+
+A_NODISCARD constexpr bool is_power_of_two(usize x) noexcept {
+    return x != 0 &amp;&amp; ((x &amp; (x - 1)) == 0);
+}
+
+A_NODISCARD constexpr bool is_overflow(memory_req r) noexcept {
+    return r.bytes == req_overflow_bytes;
+}
+
+A_NODISCARD constexpr bool is_valid(memory_req r) noexcept {
+    return is_power_of_two(r.align) &amp;&amp; !is_overflow(r);
+}
+
+A_NODISCARD constexpr usize align_up(usize value, usize align) noexcept {
+    if (!is_power_of_two(align)) {
+        return req_overflow_bytes;
+    }
+    const usize mask = align - 1;
+    const usize aligned = (value + mask) &amp; ~mask;
+    if (aligned &lt; value) {
+        return req_overflow_bytes;
+    }
+    return aligned;
+}
+
+// req_max models peak reusable region (exclusive phases), not packed layout.
+A_NODISCARD constexpr memory_req req_max(memory_req a, memory_req b) noexcept {
+    if (is_overflow(a) || is_overflow(b) || !is_valid(a) || !is_valid(b)) {
+        return memory_req{req_overflow_bytes, 1};
+    }
+    memory_req r{};
+    r.bytes = (a.bytes &gt; b.bytes) ? a.bytes : b.bytes;
+    r.align = (a.align &gt; b.align) ? a.align : b.align;
+    return r;
+}
+
+// req_sum models sequential packed composition with alignment.
+A_NODISCARD constexpr memory_req req_sum(memory_req a, memory_req b) noexcept {
+    if (is_overflow(a) || is_overflow(b) || !is_valid(a) || !is_valid(b)) {
+        return memory_req{req_overflow_bytes, 1};
+    }
+
+    const usize start_b = align_up(a.bytes, b.align);
+    if (start_b == req_overflow_bytes) {
+        return memory_req{req_overflow_bytes, (a.align &gt; b.align) ? a.align : b.align};
+    }
+    if (b.bytes &gt; (req_overflow_bytes - start_b)) {
+        return memory_req{req_overflow_bytes, (a.align &gt; b.align) ? a.align : b.align};
+    }
+
+    memory_req r{};
+    r.bytes = start_b + b.bytes;
+    r.align = (a.align &gt; b.align) ? a.align : b.align;
+    return r;
+}
+} // namespace a
+
+</code></pre></div>
+    </section>
+    <footer class="foot">
+      <a href="index.html">Назад до Індексу Коду</a>
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+

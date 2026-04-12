@@ -1,0 +1,6 @@
+[submodule "3rd_party/stb"]
+	path = 3rd_party/stb
+	url = git@github.com:setbe/stb.git
+[submodule "3rd_party/linmath"]
+	path = 3rd_party/linmath
+	url = git@github.com:setbe/linmath.hpp.git

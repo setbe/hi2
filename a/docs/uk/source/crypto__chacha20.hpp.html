@@ -1,0 +1,326 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: crypto/chacha20.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">source</span>
+      </div>
+      <nav class="nav">
+        <a href="../index.html">Огляд</a>
+        <a href="../modules.html">Модулі</a>
+        <a href="../api-atlas.html">API Атлас</a>
+        <a href="index.html">Індекс Коду</a>
+      </nav>      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag" href="../../source/crypto__chacha20.hpp.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag active" href="crypto__chacha20.hpp.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>crypto/chacha20.hpp</h1>
+      <p><span class="pill ok">public</span></p>
+      <p class="src-path">Path: <code>a/crypto/chacha20.hpp</code></p>
+    </section>
+    <section class="section">
+      <div class="code"><pre><code>// RFC 8439: ChaCha20 and Poly1305 for IETF Protocols
+// Notes:
+// - This is the IETF ChaCha20 (32-byte key, 12-byte nonce, 32-bit counter).
+// - Encrypt/decrypt are identical (XOR with keystream).
+#pragma once
+
+#include &quot;../a.hpp&quot;
+#include &quot;detail/load_store.hpp&quot;
+#include &quot;detail/wipe.hpp&quot;
+
+namespace a {
+namespace crypto {
+    struct chacha20 {
+        using u8 = a::u8;
+        using u32 = a::u32;
+        using usize = a::usize;
+
+        using byte_view = a::byte_view;
+        using byte_view_mut = a::byte_view_mut;
+        template&lt;usize N&gt; using byte_view_n = a::byte_view_n&lt;N&gt;;
+        template&lt;usize N&gt; using byte_view_mut_n = a::byte_view_mut_n&lt;N&gt;;
+
+        // Constants
+        static A_CONSTEXPR_VAR usize BLOCK_BYTES = 64;   // 1 block = 64 bytes
+        static A_CONSTEXPR_VAR usize STATE_WORDS = 16;   // 16 x u32
+        static A_CONSTEXPR_VAR usize KEY_BYTES = 32;   // 256-bit key
+        static A_CONSTEXPR_VAR usize NONCE_BYTES = 12;   // 96-bit IETF nonce
+
+        static_assert(BLOCK_BYTES == 64, &quot;chacha20: block is 64 bytes&quot;);
+        static_assert(KEY_BYTES == 32, &quot;chacha20: key is 32 bytes&quot;);
+        static_assert(NONCE_BYTES == 12, &quot;chacha20: nonce is 12 bytes&quot;);
+
+        // RAII
+        explicit A_CONSTEXPR chacha20() noexcept
+            : _state{ 0 }, _keystream{ 0 }, _ks_off{ 0 } {}
+        ~chacha20() noexcept { wipe(); }
+
+    private:
+        A_NODISCARD A_CONSTEXPR static u32 rotl(u32 v, u32 n) noexcept {
+            return (v &lt;&lt; n) | (v &gt;&gt; (32u - n));
+        }
+
+        A_CONSTEXPR static void quarter_round(u32&amp; a, u32&amp; b, u32&amp; c, u32&amp; d) noexcept {
+            a += b; d ^= a; d = rotl(d, 16);
+            c += d; b ^= c; b = rotl(b, 12);
+            a += b; d ^= a; d = rotl(d, 8);
+            c += d; b ^= c; b = rotl(b, 7);
+        }
+
+        void keystream_block() noexcept {
+            u32 x[STATE_WORDS];
+            for (usize i = 0; i &lt; STATE_WORDS; ++i) x[i] = _state[i];
+
+            // 20 rounds = 10 double-rounds
+            for (int r = 0; r &lt; 10; ++r) {
+                // columns
+                quarter_round(x[0], x[4], x[8], x[12]);
+                quarter_round(x[1], x[5], x[9], x[13]);
+                quarter_round(x[2], x[6], x[10], x[14]);
+                quarter_round(x[3], x[7], x[11], x[15]);
+                // diagonals
+                quarter_round(x[0], x[5], x[10], x[15]);
+                quarter_round(x[1], x[6], x[11], x[12]);
+                quarter_round(x[2], x[7], x[8], x[13]);
+                quarter_round(x[3], x[4], x[9], x[14]);
+            }
+
+            // add original state and serialize
+            for (usize i = 0; i &lt; STATE_WORDS; ++i) {
+                u32 res = x[i] + _state[i];
+                detail::store32_le(_keystream + (i * 4u), res);
+            }
+
+            // increment counter (word 12), wrap modulo 2^32
+            _state[12] += 1u;
+            _ks_off = 0;
+        }
+
+        void xor_stream(byte_view in, byte_view_mut out) noexcept {
+            if (!in || !out) return;
+            if (out.size() &lt; in.size()) return; // debug build could assert; keep it no-op in release
+
+            usize pos = 0;
+            const usize n = in.size();
+
+            while (pos &lt; n) {
+                if (_ks_off == BLOCK_BYTES) {
+                    // should not happen (we reset to 0 after block), but keep invariant
+                    _ks_off = 0;
+                }
+                if (_ks_off == 0) keystream_block();
+
+                usize avail = BLOCK_BYTES - _ks_off;
+                usize take = (n - pos &lt; avail) ? (n - pos) : avail;
+
+                for (usize i = 0; i &lt; take; ++i)
+                    out[pos + i] = (u8)(in[pos + i] ^ _keystream[_ks_off + i]);
+
+                pos += take;
+                _ks_off += take;
+                if (_ks_off == BLOCK_BYTES) _ks_off = 0;
+            }
+        }
+        
+        void init(byte_view key32, byte_view nonce12, u32 counter = 1u) noexcept {
+            if (!key32 || key32.size() != KEY_BYTES) return;
+            if (!nonce12 || nonce12.size() != NONCE_BYTES) return;
+
+            // &quot;expand 32-byte k&quot;
+            _state[0] = 0x61707865u; // &quot;expa&quot;
+            _state[1] = 0x3320646eu; // &quot;nd 3&quot;
+            _state[2] = 0x79622d32u; // &quot;2-by&quot;
+            _state[3] = 0x6b206574u; // &quot;te k&quot;
+
+            // key words 4..11: load as little-endian 32-bit words
+            for (usize i = 0; i &lt; 8; ++i)
+                _state[4+i] = detail::load32_le(key32.data() + 4*i);
+
+            // counter word 12
+            _state[12] = counter;
+
+            // nonce words 13..15
+            _state[13] = detail::load32_le(nonce12.data() + 0);
+            _state[14] = detail::load32_le(nonce12.data() + 4);
+            _state[15] = detail::load32_le(nonce12.data() + 8);
+
+            _ks_off = 0;
+        }
+        void keystream(byte_view_mut out) noexcept {
+            if (!out) return;
+            usize pos = 0;
+            while (pos &lt; out.size()) {
+                if (_ks_off == 0) keystream_block();
+                usize avail = BLOCK_BYTES - _ks_off;
+                usize take = (out.size() - pos &lt; avail) ? (out.size() - pos) : avail;
+                for (usize i = 0; i &lt; take; ++i)
+                    out[pos + i] = _keystream[_ks_off + i];
+                pos += take;
+                _ks_off += take;
+                if (_ks_off == BLOCK_BYTES) _ks_off = 0;
+            }
+        }
+        void encrypt(byte_view in, byte_view_mut out) noexcept { xor_stream(in, out); }
+        void encrypt_inplace(byte_view_mut buf) noexcept {
+            if (!buf) return;
+            xor_stream(byte_view{ buf.data(), buf.size() }, buf);
+        }
+
+    public:
+        // --------------------------------------------------------------------
+        //                              Public API
+        // --------------------------------------------------------------------
+
+        // Reset logical state for next reuse
+        void reset() noexcept {
+            for (usize i = 0; i &lt; STATE_WORDS; ++i) _state[i] = 0;
+            for (usize i = 0; i &lt; BLOCK_BYTES; ++i) _keystream[i] = 0;
+            _ks_off = 0;
+        }
+
+        // Wipe cryptography secrets
+        void wipe() noexcept {
+            detail::secure_zero(_state, sizeof(_state));
+            detail::secure_zero(_keystream, sizeof(_keystream));
+            detail::secure_zero(&amp;_ks_off, sizeof(_ks_off));
+            _ks_off = 0;
+        }
+
+        // --- size-safe init ---
+
+        // Initialize state = constants | key | counter | nonce
+        // Counter default in many protocols is 1 (per RFC 8439 AEAD).
+        template&lt;usize NK, usize NN&gt;
+        void init(byte_view_n&lt;NK&gt; key, byte_view_n&lt;NN&gt; nonce, u32 counter = 1u) noexcept {
+            static_assert(NK == KEY_BYTES, &quot;chacha20::init: key must be 32 bytes&quot;);
+            static_assert(NN == NONCE_BYTES, &quot;chacha20::init: nonce must be 12 bytes&quot;);
+            init((byte_view)key.v, (byte_view)nonce.v, counter);
+        }
+        void init(const u8(&amp;key)[KEY_BYTES], const u8(&amp;nonce)[NONCE_BYTES], u32 counter = 1u) noexcept {
+            init(a::as_view(key), a::as_view(nonce), counter);
+        }
+
+        // --- size-safe keystream ---
+
+        // Generate keystream bytes into `out` (no XOR).
+        template&lt;usize N&gt; void keystream(byte_view_mut_n&lt;N&gt; out) noexcept { keystream((byte_view_mut)out.v); }
+        template&lt;usize N&gt; void keystream(u8(&amp;out)[N]) noexcept { keystream(byte_view_mut{ out, N }); }
+
+        // --- size-safe encrypt/decrypt ---
+
+        // Encrypt/decrypt: out = in XOR keystream
+        template&lt;usize N&gt; void encrypt(byte_view_n&lt;N&gt; in, byte_view_mut_n&lt;N&gt; out) noexcept { encrypt((byte_view)in.v, (byte_view_mut)out.v); }
+        template&lt;usize N&gt; void encrypt(const u8(&amp;in)[N], u8(&amp;out)[N]) noexcept { encrypt(a::as_view(in), a::as_view_mut(out)); }
+
+        // --- size-safe in-place ---
+
+        // In-place
+        template&lt;usize N&gt; void encrypt_inplace(byte_view_mut_n&lt;N&gt; buf) noexcept { encrypt_inplace((byte_view_mut)buf.v); }
+        template&lt;usize N&gt; void encrypt_inplace(u8(&amp;buf)[N]) noexcept { encrypt_inplace(a::as_view_mut(buf)); }
+
+    private:
+        u32  _state[STATE_WORDS];      // constants|key|counter|nonce
+        u8   _keystream[BLOCK_BYTES];  // last block
+        usize _ks_off;                 // offset in _keystream
+    }; // struct chacha20
+} // namespace crypto
+} // namespace a
+</code></pre></div>
+    </section>
+    <footer class="foot">
+      <a href="index.html">Назад до Індексу Коду</a>
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+

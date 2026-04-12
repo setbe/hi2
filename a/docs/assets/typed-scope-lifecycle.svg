@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="860" viewBox="0 0 1400 860">
+  <defs>
+    <style>
+      .t{font-family:'IBM Plex Sans','Segoe UI',sans-serif;fill:#243447}
+      .h{font-family:'Space Grotesk','Segoe UI',sans-serif;font-weight:700;fill:#182433}
+      .box{fill:#fff;stroke:#d7ccb9;stroke-width:2}
+      .ok{fill:#edf8f5;stroke:#82bfae}
+      .warn{fill:#fff3e9;stroke:#e0a476}
+      .dead{fill:#f0f2f7;stroke:#9ea8bf}
+      .line{stroke:#455b70;stroke-width:2.3;marker-end:url(#arrow)}
+      .note{fill:#fff8ef;stroke:#e7c89e}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#455b70"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="860" fill="#f6f1e8"/>
+  <text x="72" y="70" class="h" font-size="38">typed_scope Lifecycle</text>
+  <text x="72" y="102" class="t" font-size="20">State machine for a::typed_scope&lt;Layout&gt; and object lifetime discipline</text>
+
+  <rect x="80" y="170" width="360" height="170" rx="14" class="box ok"/>
+  <text x="106" y="210" class="h" font-size="24">Created / Active</text>
+  <text x="106" y="242" class="t" font-size="18">init_status() == ok</text>
+  <text x="106" y="270" class="t" font-size="18">active() == true</text>
+  <text x="106" y="298" class="t" font-size="18">slot&lt;T&gt; allowed</text>
+
+  <rect x="520" y="170" width="360" height="170" rx="14" class="box warn"/>
+  <text x="546" y="210" class="h" font-size="24">Constructed Objects</text>
+  <text x="546" y="242" class="t" font-size="18">construct&lt;T&gt; sets bitset flag</text>
+  <text x="546" y="270" class="t" font-size="18">get&lt;T&gt; returns ptr only if constructed</text>
+  <text x="546" y="298" class="t" font-size="18">destroy&lt;T&gt; clears flag</text>
+
+  <rect x="940" y="170" width="380" height="170" rx="14" class="box dead"/>
+  <text x="966" y="208" class="h" font-size="24">Inert</text>
+  <text x="966" y="236" class="h" font-size="20">(Released / Moved-From)</text>
+  <text x="966" y="264" class="t" font-size="18">active() == false</text>
+  <text x="966" y="292" class="t" font-size="18">base == nullptr</text>
+  <text x="966" y="320" class="t" font-size="18">constructed bitset cleared</text>
+
+  <line x1="440" y1="255" x2="520" y2="255" class="line"/>
+  <text x="451" y="238" class="t" font-size="15">construct</text>
+
+  <line x1="880" y1="255" x2="940" y2="255" class="line"/>
+  <text x="892" y="238" class="t" font-size="15">release</text>
+
+  <line x1="700" y1="340" x2="700" y2="470" class="line"/>
+  <text x="720" y="410" class="t" font-size="15">destroy_all / dtor cleanup</text>
+
+  <rect x="380" y="490" width="640" height="250" rx="16" class="box note"/>
+  <text x="408" y="536" class="h" font-size="24">Contracts</text>
+  <text x="408" y="572" class="t" font-size="20">1) init_status() describes constructor result only.</text>
+  <text x="408" y="604" class="t" font-size="20">2) active() is the single usability truth.</text>
+  <text x="408" y="636" class="t" font-size="20">3) destroy_all() destroys objects only; it does not close scope.</text>
+  <text x="408" y="668" class="t" font-size="20">4) release() closes frame + makes scope inert.</text>
+  <text x="408" y="700" class="t" font-size="20">5) data() is an unsafe escape hatch by design.</text>
+</svg>

@@ -1,0 +1,486 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: crypto/poly1305.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">source</span>
+      </div>
+      <nav class="nav">
+        <a href="../index.html">Overview</a>
+        <a href="../modules.html">Modules</a>
+        <a href="../api-atlas.html">API Atlas</a>
+        <a href="index.html">Source Index</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="crypto__poly1305.hpp.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="../uk/source/crypto__poly1305.hpp.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>crypto/poly1305.hpp</h1>
+      <p><span class="pill ok">public</span></p>
+      <p class="src-path">Path: <code>a/crypto/poly1305.hpp</code></p>
+    </section>
+    <section class="section">
+      <div class="code"><pre><code>// RFC 8439: ChaCha20-Poly1305 (Poly1305 MAC, 16-byte tag, one-time key r||s)
+#pragma once
+
+#include &quot;../a.hpp&quot;
+#include &quot;detail/ct.hpp&quot;
+#include &quot;detail/load_store.hpp&quot;
+#include &quot;detail/wipe.hpp&quot;
+#include &quot;chacha20.hpp&quot;
+
+namespace a {
+namespace crypto {
+    struct poly1305 {
+        friend struct aead_chacha20_poly1305;
+
+        using u8 = a::u8;
+        using u32 = a::u32;
+        using u64 = a::u64;
+        using usize = a::usize;
+
+        using byte_view = a::byte_view;
+        using byte_view_mut = a::byte_view_mut;
+        template&lt;usize N&gt; using byte_view_n = a::byte_view_n&lt;N&gt;;
+        template&lt;usize N&gt; using byte_view_mut_n = a::byte_view_mut_n&lt;N&gt;;
+
+        // Constants
+        static A_CONSTEXPR_VAR usize TAG_BYTES = 16;
+        static A_CONSTEXPR_VAR usize OTKEY_BYTES = 32; // r(16) || s(16)
+
+        static_assert(TAG_BYTES == 16, &quot;poly1305: tag is 16 bytes&quot;);
+        static_assert(OTKEY_BYTES == 32, &quot;poly1305: one-time key is 32 bytes&quot;);
+
+        // RAII
+        explicit A_CONSTEXPR poly1305() noexcept
+            : _h{ 0,0,0,0,0 }, _r{ 0,0,0,0,0 }, _r5{ 0,0,0,0,0 }, _s{ 0,0,0,0 },
+            _buf{ 0 }, _buf_used{ 0 } {}
+        ~poly1305() noexcept { wipe(); }
+
+    private:
+        u32 _h[5]; // h accumulator (5x26-bit limbs)
+        u32 _r[5];  // r (clamped) (5x26-bit limbs)
+        u32 _r5[5]; // r*5
+
+        u8 __padding__[4]{};
+
+        u8  _buf[16]; // partial block buffer
+        u32 _buf_used;
+        u32 _s[4]; // s pad (4x32-bit LE)
+
+        A_CONSTEXPR static void clamp_r(u8 r[16]) noexcept {
+            r[3] &amp;= 15u;  r[7] &amp;= 15u;  r[11] &amp;= 15u; r[15] &amp;= 15u;
+            r[4] &amp;= 252u; r[8] &amp;= 252u; r[12] &amp;= 252u;
+        }
+
+        void blocks(const u8* m, usize count16) noexcept {
+            for (usize n = 0; n &lt; count16; ++n, m += 16) {
+                u32 t0 = (u32)m[0] | ((u32)m[1] &lt;&lt; 8) | ((u32)m[2]&lt;&lt;16) | (((u32)m[3] &amp; 0x3u) &lt;&lt; 24);
+                u32 t1 = ((u32)m[3] &gt;&gt; 2) | ((u32)m[4] &lt;&lt; 6) | ((u32)m[5] &lt;&lt; 14) | (((u32)m[6] &amp; 0xFu) &lt;&lt; 22);
+                u32 t2 = ((u32)m[6] &gt;&gt; 4) | ((u32)m[7] &lt;&lt; 4) | ((u32)m[8] &lt;&lt; 12) | (((u32)m[9] &amp; 0x3Fu) &lt;&lt; 20);
+                u32 t3 = ((u32)m[9] &gt;&gt; 6) | ((u32)m[10] &lt;&lt; 2) | ((u32)m[11] &lt;&lt; 10) | ((u32)m[12] &lt;&lt; 18);
+                u32 t4 = (u32)m[13] | ((u32)m[14] &lt;&lt; 8) | ((u32)m[15] &lt;&lt; 16);
+
+                t4 += (1u &lt;&lt; 24); // implicit 1 for full block
+
+                u32 h0 = (u64)_h[0]+t0;
+                u32 h1 = (u64)_h[1]+t1;
+                u32 h2 = (u64)_h[2]+t2;
+                u32 h3 = (u64)_h[3]+t3;
+                u32 h4 = (u64)_h[4]+t4;
+
+                u64 d0 = a::mul_u32(h0, _r[0]) + a::mul_u32(h1, _r5[4]) + a::mul_u32(h2, _r5[3]) + a::mul_u32(h3, _r5[2]) + a::mul_u32(h4, _r5[1]);
+                u64 d1 = a::mul_u32(h0, _r[1]) + a::mul_u32(h1, _r[0])  + a::mul_u32(h2, _r5[4]) + a::mul_u32(h3, _r5[3]) + a::mul_u32(h4, _r5[2]);
+                u64 d2 = a::mul_u32(h0, _r[2]) + a::mul_u32(h1, _r[1])  + a::mul_u32(h2, _r[0])  + a::mul_u32(h3, _r5[4]) + a::mul_u32(h4, _r5[3]);
+                u64 d3 = a::mul_u32(h0, _r[3]) + a::mul_u32(h1, _r[2])  + a::mul_u32(h2, _r[1])  + a::mul_u32(h3, _r[0])  + a::mul_u32(h4, _r5[4]);
+                u64 d4 = a::mul_u32(h0, _r[4]) + a::mul_u32(h1, _r[3])  + a::mul_u32(h2, _r[2])  + a::mul_u32(h3, _r[1])  + a::mul_u32(h4, _r[0]);
+
+                u64 c;
+                         c = (d0 &gt;&gt; 26); _h[0] = (u32)(d0 &amp; 0x3ffffffu);
+                d1 += c; c = (d1 &gt;&gt; 26); _h[1] = (u32)(d1 &amp; 0x3ffffffu);
+                d2 += c; c = (d2 &gt;&gt; 26); _h[2] = (u32)(d2 &amp; 0x3ffffffu);
+                d3 += c; c = (d3 &gt;&gt; 26); _h[3] = (u32)(d3 &amp; 0x3ffffffu);
+                d4 += c;                 _h[4] = (u32)(d4 &amp; 0x3ffffffu);
+
+                _h[0] += (u32)((d4 &gt;&gt; 26) * 5u);
+                _h[1] += (_h[0] &gt;&gt; 26);
+                _h[0] &amp;= 0x3ffffffu;
+            }
+        }
+        void block_partial(const u8* m, usize len) noexcept {
+            for (usize i = 0; i &lt; len; ++i) _buf[i] = m[i];
+            for (usize i = len; i &lt; 16; ++i) _buf[i] = 0;
+
+            const u8* b = _buf;
+
+            u32 t0 = (u32)b[0] | ((u32)b[1] &lt;&lt; 8)  | ((u32)b[2] &lt;&lt; 16) | (((u32)b[3] &amp; 0x3u) &lt;&lt; 24);
+            u32 t1 = ((u32)b[3] &gt;&gt; 2) | ((u32)b[4] &lt;&lt; 6) | ((u32)b[5] &lt;&lt; 14) | (((u32)b[6] &amp; 0xFu) &lt;&lt; 22);
+            u32 t2 = ((u32)b[6] &gt;&gt; 4) | ((u32)b[7] &lt;&lt; 4) | ((u32)b[8] &lt;&lt; 12) | (((u32)b[9] &amp; 0x3Fu) &lt;&lt; 20);
+            u32 t3 = ((u32)b[9] &gt;&gt; 6) | ((u32)b[10] &lt;&lt; 2) | ((u32)b[11] &lt;&lt; 10) | ((u32)b[12] &lt;&lt; 18);
+            u32 t4 = (u32)b[13] | ((u32)b[14] &lt;&lt; 8) | ((u32)b[15] &lt;&lt; 16);
+
+            // implicit 1 at bit position 8*len
+            const usize bit = len * 8;
+            const usize limb = bit / 26;
+            const usize off = bit % 26;
+            const u32 add = (u32)(1u &lt;&lt; off);
+
+            if (limb == 0) t0 += add;
+            else if (limb == 1) t1 += add;
+            else if (limb == 2) t2 += add;
+            else if (limb == 3) t3 += add;
+            else                t4 += add;
+
+            u32 h0 = (u64)_h[0] + t0;
+            u32 h1 = (u64)_h[1] + t1;
+            u32 h2 = (u64)_h[2] + t2;
+            u32 h3 = (u64)_h[3] + t3;
+            u32 h4 = (u64)_h[4] + t4;
+            
+            u64 d0 = a::mul_u32(h0, _r[0]) + a::mul_u32(h1, _r5[4]) + a::mul_u32(h2, _r5[3]) + a::mul_u32(h3, _r5[2]) + a::mul_u32(h4, _r5[1]);
+            u64 d1 = a::mul_u32(h0, _r[1]) + a::mul_u32(h1, _r[0])  + a::mul_u32(h2, _r5[4]) + a::mul_u32(h3, _r5[3]) + a::mul_u32(h4, _r5[2]);
+            u64 d2 = a::mul_u32(h0, _r[2]) + a::mul_u32(h1, _r[1])  + a::mul_u32(h2, _r[0])  + a::mul_u32(h3, _r5[4]) + a::mul_u32(h4, _r5[3]);
+            u64 d3 = a::mul_u32(h0, _r[3]) + a::mul_u32(h1, _r[2])  + a::mul_u32(h2, _r[1])  + a::mul_u32(h3, _r[0])  + a::mul_u32(h4, _r5[4]);
+            u64 d4 = a::mul_u32(h0, _r[4]) + a::mul_u32(h1, _r[3])  + a::mul_u32(h2, _r[2])  + a::mul_u32(h3, _r[1])  + a::mul_u32(h4, _r[0]);
+
+            u64 c;
+                     c = (d0 &gt;&gt; 26); _h[0] = (u32)(d0 &amp; 0x3ffffffu);
+            d1 += c; c = (d1 &gt;&gt; 26); _h[1] = (u32)(d1 &amp; 0x3ffffffu);
+            d2 += c; c = (d2 &gt;&gt; 26); _h[2] = (u32)(d2 &amp; 0x3ffffffu);
+            d3 += c; c = (d3 &gt;&gt; 26); _h[3] = (u32)(d3 &amp; 0x3ffffffu);
+            d4 += c;                 _h[4] = (u32)(d4 &amp; 0x3ffffffu);
+
+            _h[0] += (u32)((d4 &gt;&gt; 26) * 5u);
+            _h[1] += (_h[0] &gt;&gt; 26);
+            _h[0] &amp;= 0x3ffffffu;
+        }
+        void finish(u8 tag[TAG_BYTES]) const noexcept {
+            u32 h0 = _h[0], h1 = _h[1], h2 = _h[2], h3 = _h[3], h4 = _h[4];
+
+            u32 c;
+
+            c = (h1 &gt;&gt; 26); h1 &amp;= 0x3ffffffu; h2 += c;
+            c = (h2 &gt;&gt; 26); h2 &amp;= 0x3ffffffu; h3 += c;
+            c = (h3 &gt;&gt; 26); h3 &amp;= 0x3ffffffu; h4 += c;
+            c = (h4 &gt;&gt; 26); h4 &amp;= 0x3ffffffu; h0 += c * 5u;
+            c = (h0 &gt;&gt; 26); h0 &amp;= 0x3ffffffu; h1 += c;
+
+            // g = h + 5, then check carry into 2^130 (&gt;= p)
+            u32 g0 = h0 + 5u;
+            u32 g1 = h1 + (g0 &gt;&gt; 26); g0 &amp;= 0x3ffffffu;
+            u32 g2 = h2 + (g1 &gt;&gt; 26); g1 &amp;= 0x3ffffffu;
+            u32 g3 = h3 + (g2 &gt;&gt; 26); g2 &amp;= 0x3ffffffu;
+            u32 g4 = h4 + (g3 &gt;&gt; 26) - (1u &lt;&lt; 26); g3 &amp;= 0x3ffffffu;
+
+            const u32 mask = (g4 &gt;&gt; 31) - 1u; // all 1s if g4 &gt;= 0 else 0
+            h0 = (h0 &amp; ~mask) | (g0 &amp; mask);
+            h1 = (h1 &amp; ~mask) | (g1 &amp; mask);
+            h2 = (h2 &amp; ~mask) | (g2 &amp; mask);
+            h3 = (h3 &amp; ~mask) | (g3 &amp; mask);
+            h4 = (h4 &amp; ~mask) | ((g4 + (1u &lt;&lt; 26)) &amp; mask);
+
+            // collapse to 128-bit little-endian (4x32)
+            u64 f0 = ((u64)h0 | ((u64)h1 &lt;&lt; 26)) &amp; 0xffffffffu;
+            u64 f1 = (((u64)h1 &gt;&gt; 6) | ((u64)h2 &lt;&lt; 20)) &amp; 0xffffffffu;
+            u64 f2 = (((u64)h2 &gt;&gt; 12) | ((u64)h3 &lt;&lt; 14)) &amp; 0xffffffffu;
+            u64 f3 = (((u64)h3 &gt;&gt; 18) | ((u64)h4 &lt;&lt; 8)) &amp; 0xffffffffu;
+
+            f0 += _s[0];
+            f1 += _s[1] + (f0 &gt;&gt; 32);
+            f2 += _s[2] + (f1 &gt;&gt; 32);
+            f3 += _s[3] + (f2 &gt;&gt; 32);
+
+            detail::store32_le(tag + 0, (u32)f0);
+            detail::store32_le(tag + 4, (u32)f1);
+            detail::store32_le(tag + 8, (u32)f2);
+            detail::store32_le(tag + 12, (u32)f3);
+        }
+
+        void init(byte_view otk32) noexcept {
+            if (!otk32 || otk32.size() != OTKEY_BYTES) return;
+
+            u8 rbytes[16];
+            for (usize i = 0; i &lt; 16; ++i) rbytes[i] = otk32[i];
+            clamp_r(rbytes);
+
+            u32 t0 = detail::load32_le(rbytes + 0);
+            u32 t1 = detail::load32_le(rbytes + 4);
+            u32 t2 = detail::load32_le(rbytes + 8);
+            u32 t3 = detail::load32_le(rbytes + 12);
+
+            _r[0] = (t0) &amp; 0x3ffffffu;
+            _r[1] = ((t0 &gt;&gt; 26) | (t1 &lt;&lt; 6)) &amp; 0x3ffffffu;
+            _r[2] = ((t1 &gt;&gt; 20) | (t2 &lt;&lt; 12)) &amp; 0x3ffffffu;
+            _r[3] = ((t2 &gt;&gt; 14) | (t3 &lt;&lt; 18)) &amp; 0x3ffffffu;
+            _r[4] = (t3 &gt;&gt; 8);
+
+            for (usize i = 0; i &lt; 5; ++i) _r5[i] = _r[i] * 5u;
+
+            _s[0] = detail::load32_le(otk32.data() + 16);
+            _s[1] = detail::load32_le(otk32.data() + 20);
+            _s[2] = detail::load32_le(otk32.data() + 24);
+            _s[3] = detail::load32_le(otk32.data() + 28);
+
+            reset();
+        }
+        void update(byte_view m) noexcept {
+            if (!m) return;
+
+            usize off = 0;
+            usize len = m.size();
+
+            if (_buf_used != 0) {
+                usize need = 16u - _buf_used;
+                if (need &gt; len) need = len;
+                for (usize i=0; i&lt;need; ++i) _buf[_buf_used + i] = m[off + i];
+                _buf_used += (u32)need;
+                off += need;
+                len -= need;
+                if (_buf_used == 16u) {
+                    blocks(_buf, 1);
+                    _buf_used = 0;
+                }
+            }
+
+            if (len &gt;= 16u) {
+                usize full = len / 16u;
+                blocks(m.data() + off, full);
+                usize consumed = full * 16u;
+                off += consumed;
+                len -= consumed;
+            }
+
+            for (usize i=0; i&lt;len; ++i) _buf[i] = m[off + i];
+            _buf_used = (u32)len;
+        }
+        void final(byte_view_mut out_tag16) noexcept {
+            if (!out_tag16 || out_tag16.size() &lt; TAG_BYTES) return;
+
+            if (_buf_used != 0) {
+                block_partial(_buf, _buf_used);
+                _buf_used = 0;
+            }
+
+            u8 tag[TAG_BYTES];
+            finish(tag);
+
+            for (usize i = 0; i &lt; TAG_BYTES; ++i) out_tag16[i] = tag[i];
+
+            // one-time key MAC: scrub everything after use
+            wipe();
+        }
+
+    public:
+        // --------------------------------------------------------------------
+        //                              Public API
+        // --------------------------------------------------------------------
+
+        void reset() noexcept {
+            for (usize i = 0; i &lt; 5; ++i) _h[i] = 0;
+            for (usize i = 0; i &lt; 16; ++i) _buf[i] = 0;
+            _buf_used = 0;
+        }
+
+        void wipe() noexcept {
+            detail::secure_zero(_h, sizeof(_h));
+            detail::secure_zero(_r, sizeof(_r));
+            detail::secure_zero(_r5, sizeof(_r5));
+            detail::secure_zero(_s, sizeof(_s));
+            detail::secure_zero(_buf, sizeof(_buf));
+            detail::secure_zero(&amp;_buf_used, sizeof(_buf_used));
+            _buf_used = 0;
+        }
+
+        // init with one-time key (r||s)
+        template&lt;usize N&gt; void init(byte_view_n&lt;N&gt; otk) noexcept {
+            static_assert(N == OTKEY_BYTES, &quot;poly1305::init: one-time key must be 32 bytes&quot;);
+            init((byte_view)otk.v);
+        }
+        template&lt;usize N&gt; void init(const u8(&amp;otk)[N]) noexcept { init(a::as_view(otk)); }
+
+        template&lt;usize N&gt; void update(a::byte_view_n&lt;N&gt; m) noexcept { update((a::byte_view)m.v); }
+        template&lt;usize N&gt; void update(const u8(&amp;m)[N]) noexcept { update(a::as_view(m)); }
+        
+        template&lt;usize N&gt; void final(byte_view_mut_n&lt;N&gt; out_tag16) noexcept {
+            static_assert(N &gt;= TAG_BYTES, &quot;poly1305::final: out must be &gt;= 16 bytes&quot;);
+            final((byte_view_mut)out_tag16.v);
+        }
+        template&lt;usize N&gt; void final(u8(&amp;out)[N]) noexcept {
+            static_assert(N &gt;= TAG_BYTES, &quot;poly1305::final: out must be &gt;= 16 bytes&quot;);
+            final(byte_view_mut{ out, N });
+        }
+
+        template&lt;usize N&gt;
+        A_NODISCARD static A_CONSTEXPR bool ct_equal(byte_view_n&lt;N&gt; a, byte_view_n&lt;N&gt; b) noexcept {
+            return detail::ct_equal_n&lt;N&gt;(a, b);
+        }    
+        template&lt;usize NK, usize NN&gt;
+        static void derive_otk_from_chacha20(byte_view_n&lt;NK&gt; key,
+                                             byte_view_n&lt;NN&gt; nonce,
+                                             byte_view_mut_n&lt;OTKEY_BYTES&gt; out_otk) noexcept {
+            static_assert(NK == a::crypto::chacha20::KEY_BYTES, &quot;key must be 32 bytes&quot;);
+            static_assert(NN == a::crypto::chacha20::NONCE_BYTES, &quot;nonce must be 12 bytes&quot;);
+            a::crypto::chacha20 c;
+            c.init(key, nonce, 0); // counter=0
+            c.keystream(out_otk);
+        }
+
+        template&lt;usize NK, usize NN&gt;
+        static void derive_otk_from_chacha20(const u8(&amp;key)[NK],
+                                             const u8(&amp;nonce)[NN],
+                                             u8(&amp;out_otk)[OTKEY_BYTES]) noexcept {
+            derive_otk_from_chacha20(a::as_view(key), a::as_view(nonce), a::as_view_mut(out_otk));
+        }
+
+        template&lt;usize NK, usize NN, usize NM&gt;
+        static void mac_chacha20(byte_view_n&lt;NK&gt; key,
+                                 byte_view_n&lt;NN&gt; nonce,
+                                 byte_view_n&lt;NM&gt; msg,
+                                 byte_view_mut_n&lt;TAG_BYTES&gt; out_tag) noexcept {
+            u8 otk[OTKEY_BYTES]{};
+            derive_otk_from_chacha20(key, nonce, a::as_view_mut(otk));
+            poly1305 p;
+            p.init(a::as_view(otk));
+            p.update(msg);
+            p.final(out_tag);
+        }
+        template&lt;usize NM&gt;
+        static void mac_chacha20(const u8(&amp;key)[32], const u8(&amp;nonce)[12],
+                                 const u8(&amp;msg)[NM], u8(&amp;tag)[TAG_BYTES]) noexcept {
+            mac_chacha20(a::as_view(key), a::as_view(nonce), a::as_view(msg), a::as_view_mut(tag));
+        }
+
+        
+        template&lt;usize NK, usize NN, usize NM&gt;
+        A_NODISCARD static bool verify_chacha20(byte_view_n&lt;NK&gt; key,
+                                                byte_view_n&lt;NN&gt; nonce,
+                                                byte_view_n&lt;NM&gt; msg,
+                                                byte_view_n&lt;TAG_BYTES&gt; tag) noexcept {
+            u8 got[TAG_BYTES]{};
+            mac_chacha20(key, nonce, msg, a::as_view_mut(got));
+            return ct_equal&lt;TAG_BYTES&gt;(a::as_view(got), tag);
+        }
+
+        template&lt;usize NM&gt;
+        A_NODISCARD static bool verify(byte_view_n&lt;OTKEY_BYTES&gt; otk,
+                                        byte_view_n&lt;NM&gt; msg,
+                                        byte_view_n&lt;TAG_BYTES&gt; tag) noexcept {
+            u8 got[TAG_BYTES]{};
+            poly1305 p;
+            p.init(otk);
+            p.update(msg);
+            p.final(got);
+            return ct_equal&lt;TAG_BYTES&gt;(a::as_view(got), tag);
+        }
+
+        template&lt;usize NM&gt;
+        A_NODISCARD static bool verify(const u8(&amp;otk)[OTKEY_BYTES],
+                                        const u8(&amp;msg)[NM],
+                                        u8(&amp;tag)[TAG_BYTES]) noexcept {
+            u8 got[TAG_BYTES]{};
+            poly1305 p;
+            p.init(otk);
+            p.update(msg);
+            p.final(got);
+            return ct_equal&lt;TAG_BYTES&gt;(a::as_view(got), tag);
+        }
+    }; // struct poly1305
+} // namespace crypto
+} // namespace a
+</code></pre></div>
+    </section>
+    <footer class="foot">
+      <a href="index.html">Back to Source Index</a>
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+

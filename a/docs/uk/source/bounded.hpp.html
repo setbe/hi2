@@ -1,0 +1,227 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: bounded.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+<header class="top"><div class="wrap"><div class="brand brand-switch"><select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs"><option value="a">a::</option><option value="b">b::</option><option value="c">c::</option><option value="d">d::</option></select><span class="brand-tail">source</span></div><nav class="nav"><a href="../index.html">Overview</a><a href="../modules.html">Modules</a><a href="../api-atlas.html">API Atlas</a><a href="index.html">Source Index</a></nav><div class="lang-switch" aria-label="Language selector"><a class="flag" href="../../source/bounded.hpp.html" title="English" lang="en">EN</a><a class="flag active" href="bounded.hpp.html" title="Ukrainian" lang="uk">UK</a></div></div></header>
+<main class="wrap"><section class="hero"><h1>bounded.hpp</h1><p><span class="pill ok">public</span></p><p class="src-path">Path: <code>a/bounded.hpp</code></p></section><section class="section"><div class="code"><pre><code>#pragma once
+
+#include &quot;config.hpp&quot;
+#include &quot;contract.hpp&quot;
+#include &quot;meta.hpp&quot;
+#include &quot;types.hpp&quot;
+
+namespace a {
+template&lt;typename T, T Min, T Max&gt;
+struct pow2_bounded;
+
+template&lt;typename T, T V, T Min, T Max&gt;
+struct static_bounded;
+
+namespace detail {
+template&lt;typename T&gt;
+struct is_unsigned_integer
+    : constant&lt;bool,
+               is_same_v&lt;T, u8&gt; || is_same_v&lt;T, u16&gt; || is_same_v&lt;T, u32&gt; || is_same_v&lt;T, u64&gt; ||
+                   is_same_v&lt;T, usize&gt;&gt; {};
+
+template&lt;typename T&gt;
+struct is_bounded_scalar
+    : constant&lt;bool,
+               is_same_v&lt;T, i8&gt; || is_same_v&lt;T, u8&gt; || is_same_v&lt;T, i16&gt; || is_same_v&lt;T, u16&gt; ||
+                   is_same_v&lt;T, i32&gt; || is_same_v&lt;T, u32&gt; || is_same_v&lt;T, i64&gt; ||
+                   is_same_v&lt;T, u64&gt; || is_same_v&lt;T, isize&gt; || is_same_v&lt;T, usize&gt;&gt; {};
+} // namespace detail
+
+template&lt;typename T, T Min, T Max&gt;
+struct bounded {
+    static_assert(detail::is_bounded_scalar&lt;T&gt;::value,
+                  &quot;a::bounded: T must be one of a::{i/u}{8,16,32,64}, a::isize, a::usize&quot;);
+    static_assert(!(Max &lt; Min), &quot;a::bounded: Min must be &lt;= Max&quot;);
+
+    using value_type = T;
+    static A_CONSTEXPR_VAR T min_value = Min;
+    static A_CONSTEXPR_VAR T max_value = Max;
+
+    // Runtime constrained value: constructor/set enforce [Min, Max].
+    T value = Min;
+
+    A_CONSTEXPR bounded() noexcept = default;
+
+    A_CONSTEXPR explicit bounded(T v) noexcept
+        : value(v) {
+        contract::require(in_range(v));
+    }
+
+    A_NODISCARD static A_CONSTEXPR bool in_range(T v) noexcept {
+        return !(v &lt; Min) &amp;&amp; !(Max &lt; v);
+    }
+
+    A_NODISCARD static A_CONSTEXPR bool try_make(T v, bounded&amp; out) noexcept {
+        if (!in_range(v)) {
+            return false;
+        }
+        out = make_trusted(v);
+        return true;
+    }
+
+    A_CONSTEXPR void set(T v) noexcept {
+        contract::require(in_range(v));
+        value = v;
+    }
+
+    A_NODISCARD A_CONSTEXPR T get() const noexcept {
+        return value;
+    }
+
+    A_NODISCARD A_CONSTEXPR explicit operator T() const noexcept {
+        return value;
+    }
+
+private:
+    template&lt;typename U, U MinU, U MaxU&gt;
+    friend struct pow2_bounded;
+
+    template&lt;typename U, U VU, U MinU, U MaxU&gt;
+    friend struct static_bounded;
+
+    struct trusted_tag {};
+
+    A_NODISCARD static A_CONSTEXPR bounded make_trusted(T v) noexcept {
+        return bounded(v, trusted_tag{});
+    }
+
+    A_CONSTEXPR bounded(T v, trusted_tag) noexcept
+        : value(v) {}
+};
+
+template&lt;typename T&gt;
+A_NODISCARD A_CONSTEXPR bool is_pow2(T v) noexcept {
+    static_assert(detail::is_unsigned_integer&lt;T&gt;::value,
+                  &quot;a::is_pow2&lt;T&gt;: T must be an unsigned integer type&quot;);
+    return (v &gt; static_cast&lt;T&gt;(0)) &amp;&amp; ((v &amp; (v - static_cast&lt;T&gt;(1))) == static_cast&lt;T&gt;(0));
+}
+
+template&lt;typename T, T Min, T Max&gt;
+struct pow2_bounded {
+    static_assert(detail::is_unsigned_integer&lt;T&gt;::value,
+                  &quot;a::pow2_bounded: T must be an unsigned integer type&quot;);
+    static_assert(is_pow2(Min), &quot;a::pow2_bounded: Min must be power-of-two&quot;);
+    static_assert(is_pow2(Max), &quot;a::pow2_bounded: Max must be power-of-two&quot;);
+
+    using bounded_type = bounded&lt;T, Min, Max&gt;;
+    using value_type = T;
+
+    bounded_type value = bounded_type::make_trusted(Min);
+
+    A_CONSTEXPR pow2_bounded() noexcept = default;
+
+    A_CONSTEXPR explicit pow2_bounded(T v) noexcept
+        : value(bounded_type::make_trusted(Min)) {
+        contract::require(in_range(v));
+        value = bounded_type::make_trusted(v);
+    }
+
+    A_NODISCARD static A_CONSTEXPR bool in_range(T v) noexcept {
+        return bounded_type::in_range(v) &amp;&amp; is_pow2(v);
+    }
+
+    A_NODISCARD static A_CONSTEXPR bool try_make(T v, pow2_bounded&amp; out) noexcept {
+        if (!in_range(v)) {
+            return false;
+        }
+        out = make_trusted(v);
+        return true;
+    }
+
+    A_CONSTEXPR void set(T v) noexcept {
+        contract::require(in_range(v));
+        value = bounded_type::make_trusted(v);
+    }
+
+    A_NODISCARD A_CONSTEXPR T get() const noexcept {
+        return value.get();
+    }
+
+    A_NODISCARD A_CONSTEXPR explicit operator T() const noexcept {
+        return value.get();
+    }
+
+private:
+    struct trusted_tag {};
+
+    A_NODISCARD static A_CONSTEXPR pow2_bounded make_trusted(T v) noexcept {
+        return pow2_bounded(v, trusted_tag{});
+    }
+
+    A_CONSTEXPR pow2_bounded(T v, trusted_tag) noexcept
+        : value(bounded_type::make_trusted(v)) {}
+};
+
+template&lt;typename T, T V, T Min, T Max&gt;
+struct static_bounded {
+    static_assert(bounded&lt;T, Min, Max&gt;::in_range(V),
+                  &quot;a::static_bounded: V must be inside [Min, Max]&quot;);
+
+    using value_type = T; // Compile-time constrained constant (no runtime check path).
+    using bounded_type = bounded&lt;T, Min, Max&gt;;
+
+    static A_CONSTEXPR_VAR T value = V;
+
+    A_NODISCARD static A_CONSTEXPR bounded_type make() noexcept {
+        return bounded_type::make_trusted(V);
+    }
+};
+} // namespace a
+</code></pre></div></section><footer class="foot"><a href="index.html">Back to Source Index</a></footer></main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+  function splitPath(path) { return path.split('/').filter(function (s) { return s.length > 0; }); }
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') { projectIndex = i; break; }
+  }
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+  var prefix = '/';
+  if (projectIndex > 0) { prefix = '/' + segments.slice(0, projectIndex).join('/') + '/'; }
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) { window.location.href = preferred; return; }
+    } catch (e) {}
+    window.location.href = fallbackUrl(project);
+  }
+  select.addEventListener('change', function (e) { switchProject(e.target.value); });
+})();
+</script>
+</body>
+</html>

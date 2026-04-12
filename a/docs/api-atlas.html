@@ -1,0 +1,215 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: API Atlas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">API atlas</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Overview</a>
+        <a href="modules.html">Modules</a>
+        <a href="api-atlas.html">API Atlas</a>
+        <a href="memory-model.html">Memory Model</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Crypto</a>
+        <a href="recipes.html">Recipes</a>
+        <a href="source/index.html">Source</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="api-atlas.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="uk/api-atlas.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>API Atlas</h1>
+      <p>A compact reference for the most important public contracts in <code>a::</code>.</p>
+    </section>
+
+    <section class="section">
+      <h2>Memory Algebra and Scope Model</h2>
+      <table>
+        <thead><tr><th>Entity</th><th>Kind</th><th>Contract</th></tr></thead>
+        <tbody>
+          <tr><td><code>a::memory_req</code></td><td>struct</td><td><code>{ bytes, align }</code> with overflow sentinel</td></tr>
+          <tr><td><code>a::req_sum(a,b)</code></td><td>constexpr fn</td><td>Aligned packed composition (sequential layout)</td></tr>
+          <tr><td><code>a::req_max(a,b)</code></td><td>constexpr fn</td><td>Peak reusable region (exclusive phases)</td></tr>
+          <tr><td><code>a::component_req&lt;T&gt;</code></td><td>traits</td><td>Default: <code>T::requirement()</code>, extensible via specialization</td></tr>
+          <tr><td><code>a::sum_req&lt;Ts...&gt;</code></td><td>type-level</td><td>Compile-time sum with alignment</td></tr>
+          <tr><td><code>a::max_req&lt;Ts...&gt;</code></td><td>type-level</td><td>Compile-time max semantics</td></tr>
+          <tr><td><code>a::layout&lt;Ts...&gt;</code></td><td>type-level</td><td>Offsets, indexing, duplicate-type rejection, requirement static checks</td></tr>
+          <tr><td><code>a::scope_spec&lt;Ts...&gt;</code></td><td>type-level</td><td>Named wrapper around layout requirement</td></tr>
+          <tr><td><code>a::typed_scope&lt;Layout&gt;</code></td><td>runtime object</td><td>Constructed-state tracking, <code>slot/get/construct/destroy/release</code></td></tr>
+          <tr><td><code>a::two_pass::scope&lt;Ts...&gt;</code></td><td>runtime object</td><td>Convenience wrapper over <code>a::typed_scope&lt;a::layout&lt;Ts...&gt;&gt;</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>typed_scope Invariants</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Usability</h3>
+          <p class="muted"><code>active()</code> / <code>operator bool()</code> defines whether a scope can be used. <code>init_status()</code> stores initialization result only.</p>
+        </article>
+        <article class="card">
+          <h3>Cleanup vs Close</h3>
+          <p class="muted"><code>destroy_all()</code> cleans constructed objects only. <code>release()</code> closes the frame and makes the scope inert.</p>
+        </article>
+        <article class="card">
+          <h3>Type Safety</h3>
+          <p class="muted"><code>slot/get/construct/destroy</code> statically verify that <code>T</code> belongs to the <code>Layout</code>.</p>
+        </article>
+        <article class="card">
+          <h3>Nothrow Policy</h3>
+          <p class="muted">For typed construction, components must be nothrow-constructible and nothrow-destructible.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Contracts and Constrained Values</h2>
+      <table>
+        <thead><tr><th>File</th><th>Main Surface</th><th>When to Use</th></tr></thead>
+        <tbody>
+          <tr><td><code>a/profile.hpp</code></td><td><code>profile::level</code>, <code>preset</code>, <code>current_level</code></td><td>Select build-wide contract mode (<code>strict</code>/<code>audit</code>/<code>lean</code>)</td></tr>
+          <tr><td><code>a/contract.hpp</code></td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>assume</code>, <code>assume_verified</code>, <code>unreachable</code></td><td>Enforce correctness as hard-fail contracts</td></tr>
+          <tr><td><code>a/bounded.hpp</code></td><td><code>bounded</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td><td>Represent dimensions/counts/alignment as validated types</td></tr>
+        </tbody>
+      </table>
+      <ul>
+        <li><code>require</code>: caller/API preconditions.</li>
+        <li><code>assume</code>: checked assumption (panic on false, optional optimizer hint on true).</li>
+        <li><code>assume_verified</code>: use after prior proof/check; same failure semantics as <code>assume</code>.</li>
+        <li>Trusted path in bounded types is internal-only construction, not a user-input bypass.</li>
+      </ul>
+      <p class="infobox"><strong>See:</strong> <code>a/CONTRACTS.md</code> for compact decision rules.</p>
+    </section>
+
+    <section class="section">
+      <h2>Core Utility Surface</h2>
+      <table>
+        <thead><tr><th>Area</th><th>Examples</th></tr></thead>
+        <tbody>
+          <tr><td>Views</td><td><code>a::view&lt;T&gt;</code>, <code>a::view_n&lt;T,N&gt;</code>, <code>a::byte_view</code>, <code>a::as_view</code></td></tr>
+          <tr><td>Bit</td><td><code>load_le/load_be</code>, <code>store_le/store_be</code>, <code>byteswap</code>, <code>rotl/rotr</code>, <code>bitset&lt;N&gt;</code></td></tr>
+          <tr><td>Math</td><td><code>mul_u64</code>, <code>add_u128</code>, <code>div_u64_u32</code>, <code>f2u8</code></td></tr>
+          <tr><td>Meta/Utility</td><td><code>enable_if</code>, <code>is_same</code>, <code>remove_reference</code>, <code>move/forward</code>, <code>launder_ptr</code></td></tr>
+          <tr><td>Arena</td><td><code>arena_view::alloc/mark/rewind/reset</code>, <code>a::scope</code> rollback RAII</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Crypto API Surface</h2>
+      <table>
+        <thead><tr><th>Type</th><th>Main Methods</th></tr></thead>
+        <tbody>
+          <tr><td><code>a::crypto::sha256</code></td><td><code>update</code>, <code>final</code>, <code>hmac</code>, <code>reset</code></td></tr>
+          <tr><td><code>a::crypto::sha384</code></td><td><code>update</code>, <code>final</code>, <code>hmac</code>, <code>reset</code></td></tr>
+          <tr><td><code>a::crypto::chacha20</code></td><td><code>init</code>, <code>keystream</code>, <code>encrypt</code>, <code>encrypt_inplace</code>, <code>wipe</code></td></tr>
+          <tr><td><code>a::crypto::poly1305</code></td><td><code>init</code>, <code>update</code>, <code>final</code>, <code>ct_equal</code>, derive/verify helpers</td></tr>
+          <tr><td><code>a::crypto::aead_chacha20_poly1305</code></td><td><code>seal</code>, <code>open</code>, <code>mac_rfc8439</code></td></tr>
+          <tr><td><code>a::crypto::x25519</code></td><td><code>generate_public</code>, <code>shared_secret</code>, <code>ct_equal32</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Detailed Source</h2>
+      <p>For exact line-by-line definitions, open <a href="source/index.html">Source Reference</a>.</p>
+    </section>
+
+    <footer class="foot">
+      API atlas for <code>a::</code>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+

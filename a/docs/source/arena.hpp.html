@@ -1,0 +1,257 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: arena.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">source</span>
+      </div>
+      <nav class="nav">
+        <a href="../index.html">Overview</a>
+        <a href="../modules.html">Modules</a>
+        <a href="../api-atlas.html">API Atlas</a>
+        <a href="index.html">Source Index</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="arena.hpp.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="../uk/source/arena.hpp.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>arena.hpp</h1>
+      <p><span class="pill ok">public</span></p>
+      <p class="src-path">Path: <code>a/arena.hpp</code></p>
+    </section>
+    <section class="section">
+      <div class="code"><pre><code>#pragma once
+
+#include &quot;config.hpp&quot;
+#include &quot;memory_requirements.hpp&quot;
+#include &quot;status.hpp&quot;
+#include &quot;types.hpp&quot;
+
+namespace a {
+struct alloc_result {
+    void* ptr = nullptr;
+    status code = status::ok;
+};
+
+struct arena_view {
+    u8* data = nullptr;
+    usize size = 0;
+    usize offset = 0;
+
+    A_NODISCARD A_CONSTEXPR bool empty() const noexcept { return size == 0; }
+    A_NODISCARD A_CONSTEXPR bool valid_storage() const noexcept { return empty() || data != nullptr; }
+    A_NODISCARD A_CONSTEXPR bool valid() const noexcept { return valid_storage(); }
+    A_NODISCARD A_CONSTEXPR usize mark() const noexcept { return offset; }
+
+    A_CONSTEXPR void rewind(usize m) noexcept {
+        offset = (m &lt;= size) ? m : size;
+    }
+
+    A_CONSTEXPR void reset() noexcept {
+        offset = 0;
+    }
+
+    A_NODISCARD A_CONSTEXPR usize remaining() const noexcept {
+        return (offset &lt;= size) ? (size - offset) : 0;
+    }
+
+    A_NODISCARD A_CONSTEXPR static bool can_align(usize align) noexcept {
+        return is_power_of_two(align);
+    }
+
+    A_NODISCARD alloc_result alloc(usize bytes, usize align = alignof(void*)) noexcept {
+        if ((bytes == 0) || !can_align(align)) {
+            return {nullptr, status::invalid_input};
+        }
+        if (!valid_storage()) {
+            return {nullptr, status::invalid_input};
+        }
+        if (offset &gt; size) {
+            return {nullptr, status::mismatch};
+        }
+
+        const usize base = offset;
+        const usize mask = align - 1;
+        const usize aligned = (base + mask) &amp; ~mask;
+        if (aligned &lt; base) {
+            return {nullptr, status::overflow};
+        }
+        if (bytes &gt; size - aligned) {
+            return {nullptr, status::insufficient_memory};
+        }
+
+        u8* p = data + aligned;
+        offset = aligned + bytes;
+        return {p, status::ok};
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD T* alloc_object(status* out_code = nullptr) noexcept {
+        const alloc_result r = alloc(sizeof(T), alignof(T));
+        if (out_code != nullptr) {
+            *out_code = r.code;
+        }
+        return static_cast&lt;T*&gt;(r.ptr);
+    }
+
+    template&lt;typename T&gt;
+    A_NODISCARD T* alloc_array(usize count, status* out_code = nullptr) noexcept {
+        if (count == 0) {
+            if (out_code != nullptr) {
+                *out_code = status::invalid_input;
+            }
+            return nullptr;
+        }
+        if (sizeof(T) != 0 &amp;&amp; count &gt; (static_cast&lt;usize&gt;(-1) / sizeof(T))) {
+            if (out_code != nullptr) {
+                *out_code = status::overflow;
+            }
+            return nullptr;
+        }
+        const alloc_result r = alloc(sizeof(T) * count, alignof(T));
+        if (out_code != nullptr) {
+            *out_code = r.code;
+        }
+        return static_cast&lt;T*&gt;(r.ptr);
+    }
+};
+
+struct scope {
+    arena_view* arena = nullptr;
+    usize saved = 0;
+    bool active = false;
+
+    explicit scope(arena_view&amp; a) noexcept
+        : arena(&amp;a), saved(a.mark()), active(true) {}
+
+    scope(const scope&amp;) = delete;
+    scope&amp; operator=(const scope&amp;) = delete;
+
+    scope(scope&amp;&amp; other) noexcept
+        : arena(other.arena), saved(other.saved), active(other.active) {
+        other.active = false;
+    }
+
+    scope&amp; operator=(scope&amp;&amp; other) noexcept {
+        if (this == &amp;other) {
+            return *this;
+        }
+        if (active &amp;&amp; arena != nullptr) {
+            arena-&gt;rewind(saved);
+        }
+        arena = other.arena;
+        saved = other.saved;
+        active = other.active;
+        other.active = false;
+        return *this;
+    }
+
+    ~scope() noexcept {
+        if (active &amp;&amp; arena != nullptr) {
+            arena-&gt;rewind(saved);
+        }
+    }
+
+    void release() noexcept {
+        active = false;
+    }
+};
+
+} // namespace a
+</code></pre></div>
+    </section>
+    <footer class="foot">
+      <a href="index.html">Back to Source Index</a>
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+

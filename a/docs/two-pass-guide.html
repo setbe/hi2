@@ -1,0 +1,214 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: Two Pass Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">two pass guide</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Overview</a>
+        <a href="modules.html">Modules</a>
+        <a href="api-atlas.html">API Atlas</a>
+        <a href="memory-model.html">Memory Model</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Crypto</a>
+        <a href="recipes.html">Recipes</a>
+        <a href="source/index.html">Source</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="two-pass-guide.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="uk/two-pass-guide.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1><code>a::two_pass</code> Protocol Guide</h1>
+      <p>
+        <code>a::two_pass</code> is a planning discipline, not just another API.
+        First you validate and size memory, then you build into a known arena region.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Core Types</h2>
+      <table>
+        <thead><tr><th>Type</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code>a::two_pass::plan_result&lt;Plan&gt;</code></td><td><code>status code</code> + <code>Plan plan</code> + <code>memory_req memory</code></td></tr>
+          <tr><td><code>a::two_pass::build_result&lt;Output&gt;</code></td><td><code>status code</code> + <code>Output value</code></td></tr>
+          <tr><td><code>a::two_pass::build_result&lt;void&gt;</code></td><td>Build-only status without payload</td></tr>
+          <tr><td><code>a::two_pass::traits&lt;Plan,Input&gt;</code></td><td>Customization point for concrete modules</td></tr>
+          <tr><td><code>a::two_pass::static_req&lt;Bytes,Align&gt;</code></td><td>Compile-time leaf requirement</td></tr>
+          <tr><td><code>a::two_pass::scope&lt;Ts...&gt;</code></td><td>Wrapper over <code>a::typed_scope&lt;a::layout&lt;Ts...&gt;&gt;</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>How to implement a module-level two-pass flow</h2>
+      <div class="code"><pre><code>struct image_input {
+    a::byte_view encoded;
+    a::u32 max_w;
+    a::u32 max_h;
+};
+
+struct image_plan {
+    a::u32 width;
+    a::u32 height;
+    a::memory_req scratch;
+};
+
+struct image_output {
+    a::byte_view pixels;
+};
+
+namespace a::two_pass {
+template&lt;&gt;
+struct traits&lt;image_plan, image_input&gt; {
+    static plan_result&lt;image_plan&gt; plan(const image_input& in) noexcept;
+    static build_result&lt;image_output&gt; build(const image_plan& p,
+                                             a::arena_view arena,
+                                             a::byte_view out_pixels) noexcept;
+};
+}</code></pre></div>
+      <p class='code-note'>This is the protocol skeleton: <code>plan()</code> validates input and memory shape, while <code>build()</code> consumes the approved plan and arena.<br><strong>Plain example:</strong> plan checks image header and required scratch size, build decodes only if that plan succeeded.</p>
+    </section>
+
+    <section class="section">
+      <h2>Status Discipline</h2>
+      <ul>
+        <li>Do not collapse outcomes into <code>bool</code>; return <code>a::status</code>.</li>
+        <li>Use <code>status::insufficient_memory</code> for memory pressure.</li>
+        <li>Use <code>invalid_input</code>, <code>mismatch</code>, <code>overflow</code> for contract violations.</li>
+        <li>Use <code>unsupported</code> or <code>backend_failure</code> for backend/decode issues.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Composition Helpers</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Static components</h3>
+          <div class="code"><pre><code>using req = a::sum_req&lt;
+    a::two_pass::static_req&lt;4096, 16&gt;,
+    a::two_pass::static_req&lt;8192, 16&gt;
+&gt;;</code></pre></div>
+      <p class='code-note'>This creates a fully static requirement bundle where size and alignment are known at compile time.<br><strong>Plain example:</strong> combining 4 KB and 8 KB static pieces lets you know exact minimum memory before flashing firmware.</p>
+        </article>
+        <article class="card">
+          <h3>Context selection</h3>
+          <div class="code"><pre><code>using boot = a::sum_req&lt;font_plan, atlas_build&gt;;
+using run  = a::sum_req&lt;frame_state, ui_state&gt;;
+using peak = a::max_req&lt;boot, run&gt;;</code></pre></div>
+      <p class='code-note'>This combines two context requirements and computes one peak memory contract for exclusive execution phases.<br><strong>Plain example:</strong> menu context needs 24 KB, gameplay needs 80 KB, so one 80 KB arena is enough.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Contract Checklist</h2>
+      <ul>
+        <li>Plan phase does not mutate user buffers.</li>
+        <li>Build phase stays inside memory bounds defined by plan.</li>
+        <li>Temporary storage lives in <code>a::arena_view</code>.</li>
+        <li>Sensitive data is wiped in crypto paths.</li>
+        <li>Public API remains free of platform/OS types.</li>
+      </ul>
+    </section>
+
+    <footer class="foot">
+      See also: <a href="memory-model.html">Memory Model</a>, <a href="recipes.html">Recipes</a>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
+

@@ -1,0 +1,176 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: contract.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<header class="top"><div class="wrap"><div class="brand brand-switch"><select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs"><option value="a">a::</option><option value="b">b::</option><option value="c">c::</option><option value="d">d::</option></select><span class="brand-tail">source</span></div><nav class="nav"><a href="../index.html">Overview</a><a href="../modules.html">Modules</a><a href="../api-atlas.html">API Atlas</a><a href="index.html">Source Index</a></nav><div class="lang-switch" aria-label="Language selector"><a class="flag active" href="contract.hpp.html" title="English" lang="en">EN</a><a class="flag" href="../uk/source/contract.hpp.html" title="Ukrainian" lang="uk">UK</a></div></div></header>
+<main class="wrap"><section class="hero"><h1>contract.hpp</h1><p><span class="pill ok">public</span></p><p class="src-path">Path: <code>a/contract.hpp</code></p></section><section class="section"><div class="code"><pre><code>#pragma once
+
+#include &quot;config.hpp&quot;
+#include &quot;profile.hpp&quot;
+
+namespace a {
+namespace contract {
+namespace detail {
+A_FORCE_INLINE void emit_assume_hint(bool cond) noexcept {
+#if A_COMPILER_MSVC
+    __assume(cond);
+#elif A_COMPILER_CLANG
+    __builtin_assume(cond);
+#elif A_COMPILER_GCC
+    if (!cond) {
+        __builtin_unreachable();
+    }
+#else
+    (void)cond;
+#endif
+}
+} // namespace detail
+
+[[noreturn]] A_FORCE_INLINE void panic(const char* msg) noexcept {
+    (void)msg;
+
+    // Optional hook for logging/telemetry only.
+    // Recovery is not supported: panic() never returns.
+#if defined(A_CONTRACT_PANIC)
+    A_CONTRACT_PANIC(msg);
+#endif
+
+    // Optional trap hook (for hosted/debug integrations on toolchains without builtin_trap).
+#if defined(A_CONTRACT_TRAP)
+    A_CONTRACT_TRAP();
+#endif
+
+#if A_COMPILER_CLANG || A_COMPILER_GCC
+    __builtin_trap();
+#endif
+
+    for (;;) {}
+}
+
+template&lt;profile::level Level&gt;
+A_FORCE_INLINE void require_as(bool cond) noexcept {
+    const profile::settings s = profile::preset&lt;Level&gt;::value();
+    if (s.check_require &amp;&amp; A_UNLIKELY(!cond)) {
+        panic(&quot;require&quot;);
+    }
+}
+
+template&lt;profile::level Level&gt;
+A_FORCE_INLINE void ensure_as(bool cond) noexcept {
+    const profile::settings s = profile::preset&lt;Level&gt;::value();
+    if (s.check_ensure &amp;&amp; A_UNLIKELY(!cond)) {
+        panic(&quot;ensure&quot;);
+    }
+}
+
+template&lt;profile::level Level&gt;
+A_FORCE_INLINE void invariant_as(bool cond) noexcept {
+    const profile::settings s = profile::preset&lt;Level&gt;::value();
+    if (s.check_invariant &amp;&amp; A_UNLIKELY(!cond)) {
+        panic(&quot;invariant&quot;);
+    }
+}
+
+template&lt;profile::level Level&gt;
+A_FORCE_INLINE void assume_as(bool cond) noexcept;
+
+// `assume_verified` is for conditions already proven by prior contract checks.
+// It never introduces UB: false still goes through panic().
+template&lt;profile::level Level&gt;
+A_FORCE_INLINE void assume_verified_as(bool cond) noexcept {
+    assume_as&lt;Level&gt;(cond);
+}
+
+template&lt;profile::level Level&gt;
+A_FORCE_INLINE void assume_as(bool cond) noexcept {
+    const profile::settings s = profile::preset&lt;Level&gt;::value();
+    static_assert(profile::preset&lt;Level&gt;::value().check_assume,
+                  &quot;a::contract::assume_as&lt;Level&gt;: profile must keep assume checks enabled&quot;);
+    if (A_UNLIKELY(!cond)) {
+        panic(&quot;assume&quot;);
+    }
+    if (s.emit_assume_hint) {
+        detail::emit_assume_hint(cond);
+    }
+}
+
+[[noreturn]] A_FORCE_INLINE void unreachable() noexcept {
+    // Hard-fail contract: no recovery, no continuation.
+    panic(&quot;unreachable&quot;);
+}
+
+A_FORCE_INLINE void require(bool cond) noexcept {
+    require_as&lt;profile::current_level&gt;(cond);
+}
+
+A_FORCE_INLINE void ensure(bool cond) noexcept {
+    ensure_as&lt;profile::current_level&gt;(cond);
+}
+
+A_FORCE_INLINE void invariant(bool cond) noexcept {
+    invariant_as&lt;profile::current_level&gt;(cond);
+}
+
+A_FORCE_INLINE void assume_verified(bool cond) noexcept {
+    assume_verified_as&lt;profile::current_level&gt;(cond);
+}
+
+A_FORCE_INLINE void assume(bool cond) noexcept {
+    // Checked assume: fails hard on false, optional optimizer hint on true.
+    assume_as&lt;profile::current_level&gt;(cond);
+}
+} // namespace contract
+} // namespace a
+</code></pre></div></section><footer class="foot"><a href="index.html">Back to Source Index</a></footer></main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+  function splitPath(path) { return path.split('/').filter(function (s) { return s.length > 0; }); }
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') { projectIndex = i; break; }
+  }
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+  var prefix = '/';
+  if (projectIndex > 0) { prefix = '/' + segments.slice(0, projectIndex).join('/') + '/'; }
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) { window.location.href = preferred; return; }
+    } catch (e) {}
+    window.location.href = fallbackUrl(project);
+  }
+  select.addEventListener('change', function (e) { switchProject(e.target.value); });
+})();
+</script>
+</body>
+</html>

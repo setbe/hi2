@@ -1,0 +1,55 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">sum vs max memory semantics</title>
+  <desc id="desc">Infographic comparing req_sum for simultaneous layout and req_max for phase reuse.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f4efe6" />
+      <stop offset="100%" stop-color="#e8f4f0" />
+    </linearGradient>
+    <style>
+      .title { font: 700 42px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #1f2a37; }
+      .h2 { font: 700 28px 'Space Grotesk', 'Segoe UI', sans-serif; fill: #1f2a37; }
+      .txt { font: 500 21px 'IBM Plex Sans', 'Segoe UI', sans-serif; fill: #263543; }
+      .mono { font: 600 19px 'IBM Plex Mono', Consolas, monospace; fill: #12222d; }
+      .ok { fill: #2a9d8f; }
+      .warn { fill: #b45309; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="720" fill="url(#bg)" />
+  <text x="56" y="70" class="title">a::memory_req semantics: req_sum vs req_max</text>
+
+  <rect x="56" y="120" width="560" height="520" rx="20" fill="#fffdf8" stroke="#d5ccb8" stroke-width="2"/>
+  <text x="90" y="172" class="h2">req_sum(a, b)</text>
+  <text x="90" y="208" class="txt">For simultaneously alive components in one layout.</text>
+
+  <rect x="90" y="242" width="492" height="154" rx="14" fill="#edf9f5" stroke="#95d5c7" stroke-width="2"/>
+  <text x="112" y="282" class="mono">start_b = align_up(a.bytes, b.align)</text>
+  <text x="112" y="320" class="mono">bytes   = start_b + b.bytes</text>
+  <text x="112" y="358" class="mono">align   = max(a.align, b.align)</text>
+
+  <text x="90" y="434" class="txt">Example: font + image scratch + atlas temp</text>
+  <text x="90" y="468" class="txt">produces packed offsets for each type.</text>
+
+  <rect x="90" y="500" width="492" height="108" rx="14" fill="#fff5e7" stroke="#f1cca3" stroke-width="2"/>
+  <text x="112" y="542" class="mono">sum_req&lt;A,B,C&gt; = sequential packed layout</text>
+  <text x="112" y="578" class="mono">use when A, B, C coexist</text>
+
+  <rect x="664" y="120" width="560" height="520" rx="20" fill="#fffdf8" stroke="#d5ccb8" stroke-width="2"/>
+  <text x="698" y="172" class="h2">req_max(a, b)</text>
+  <text x="698" y="208" class="txt">For mutually exclusive contexts (phase reuse).</text>
+
+  <rect x="698" y="242" width="492" height="154" rx="14" fill="#edf3ff" stroke="#adc5f5" stroke-width="2"/>
+  <text x="720" y="282" class="mono">bytes = max(a.bytes, b.bytes)</text>
+  <text x="720" y="320" class="mono">align = max(a.align, b.align)</text>
+  <text x="720" y="358" class="mono">no packed offsets</text>
+
+  <text x="698" y="434" class="txt">Example: boot_ctx or game_ctx (not both at once).</text>
+  <text x="698" y="468" class="txt">One arena region is reused across phases.</text>
+
+  <rect x="698" y="500" width="492" height="108" rx="14" fill="#fff5e7" stroke="#f1cca3" stroke-width="2"/>
+  <text x="720" y="542" class="mono">max_req&lt;Boot,Run&gt; = peak reusable region</text>
+  <text x="720" y="578" class="mono">use when contexts are exclusive</text>
+
+  <text x="56" y="684" class="txt">Rule: sum for coexistence, max for exclusive phases.</text>
+</svg>

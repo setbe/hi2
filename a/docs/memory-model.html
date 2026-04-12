@@ -1,0 +1,225 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: Memory Model</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">memory model</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Overview</a>
+        <a href="modules.html">Modules</a>
+        <a href="api-atlas.html">API Atlas</a>
+        <a href="memory-model.html">Memory Model</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Crypto</a>
+        <a href="recipes.html">Recipes</a>
+        <a href="source/index.html">Source</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="memory-model.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="uk/memory-model.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Deterministic Memory Model</h1>
+      <p>
+        In <code>a::</code>, memory is explicit. You define requirements first,
+        then provide real storage, and execution stays inside those boundaries.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Primitives</h2>
+      <table>
+        <thead><tr><th>Entity</th><th>Purpose</th><th>File</th></tr></thead>
+        <tbody>
+          <tr><td><code>a::memory_req</code></td><td>Base contract <code>{bytes, align}</code></td><td><code>a/memory_requirements.hpp</code></td></tr>
+          <tr><td><code>a::req_sum</code></td><td>Packed composition with alignment (sum semantics)</td><td><code>a/memory_requirements.hpp</code></td></tr>
+          <tr><td><code>a::req_max</code></td><td>Peak reusable region (max semantics)</td><td><code>a/memory_requirements.hpp</code></td></tr>
+          <tr><td><code>a::arena_view</code></td><td>Non-owning arena allocation cursor</td><td><code>a/arena.hpp</code></td></tr>
+          <tr><td><code>a::scope</code></td><td>RAII rewind frame (mark/rollback)</td><td><code>a/arena.hpp</code></td></tr>
+          <tr><td><code>a::typed_scope&lt;Layout&gt;</code></td><td>Type-composed slots + construction tracking</td><td><code>a/two_pass.hpp</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>sum vs max</h2>
+      <div class="grid">
+        <article class="card">
+          <h3><code>req_sum(a,b)</code></h3>
+          <p class="muted">Use when components coexist in the same layout.</p>
+          <div class="code"><pre><code>start_b = align_up(a.bytes, b.align)
+result.bytes = start_b + b.bytes
+result.align = max(a.align, b.align)</code></pre></div>
+      <p class='code-note'>This formula aligns the second component, appends its bytes, and keeps the strictest alignment in the resulting packed layout.<br><strong>Plain example:</strong> if block A ends at byte 20 and block B requires align 16, B starts at byte 32, not 21.</p>
+        </article>
+        <article class="card">
+          <h3><code>req_max(a,b)</code></h3>
+          <p class="muted">Use when phases are mutually exclusive and reuse one arena.</p>
+          <div class="code"><pre><code>result.bytes = max(a.bytes, b.bytes)
+result.align = max(a.align, b.align)</code></pre></div>
+      <p class='code-note'>This formula does not pack components together; it computes the peak reusable region for mutually exclusive phases.<br><strong>Plain example:</strong> if boot needs 96 KB and runtime needs 40 KB, reserve 96 KB total.</p>
+        </article>
+      </div>
+      <p class="infobox"><strong>Rule:</strong> <code>sum</code> for coexistence, <code>max</code> for exclusive phases.</p>
+      <img class="infographic" src="assets/sum-vs-max.svg" alt="sum vs max semantics">
+    </section>
+
+    <section class="section">
+      <h2>Compile-Time Composition by Types</h2>
+      <div class="code"><pre><code>struct font_phase {
+    static constexpr a::memory_req requirement() noexcept { return {32 * 1024, 16}; }
+};
+
+struct image_phase {
+    static constexpr a::memory_req requirement() noexcept { return {96 * 1024, 16}; }
+};
+
+using load_layout = a::layout&lt;font_phase, image_phase&gt;;
+constexpr a::memory_req load_req = load_layout::requirement();
+
+using boot_req = a::sum_req&lt;font_phase, image_phase&gt;;
+using runtime_req = a::max_req&lt;font_phase, image_phase&gt;;</code></pre></div>
+      <p class='code-note'>This example shows type-level memory contracts: every type exposes <code>requirement()</code>, and composition happens fully at compile time.<br><strong>Plain example:</strong> <code>font_phase</code> says "32 KB", <code>image_phase</code> says "96 KB", and the compiler precomputes the total before run.</p>
+    </section>
+
+    <section class="section">
+      <h2>typed_scope Lifecycle Rules</h2>
+      <ul>
+        <li><code>active()</code> tells if the scope is usable; <code>init_status()</code> stores start-up outcome only.</li>
+        <li><code>slot&lt;T&gt;()</code> returns raw storage; no object lifetime is started.</li>
+        <li><code>construct&lt;T&gt;()</code> starts lifetime with placement new and marks construction state.</li>
+        <li><code>destroy&lt;T&gt;()</code> destroys only objects that were actually constructed.</li>
+        <li><code>destroy_all()</code> is cleanup only; it does not close the scope.</li>
+        <li><code>release()</code> closes the frame and makes the scope inert.</li>
+        <li><code>data()</code> is an unsafe escape hatch that bypasses lifetime discipline.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Contract Decision Rules</h2>
+      <table>
+        <thead><tr><th>Rule</th><th>Use</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td><code>require(cond)</code></td><td>API/caller precondition</td><td><code>require(bytes &gt; 0)</code> before allocation</td></tr>
+          <tr><td><code>ensure(cond)</code></td><td>Postcondition after operation</td><td><code>ensure(offset &lt;= size)</code> after update</td></tr>
+          <tr><td><code>invariant(cond)</code></td><td>Internal consistency rule</td><td><code>invariant(mark &lt;= size)</code></td></tr>
+          <tr><td><code>assume(cond)</code></td><td>Checked assumption + optional optimizer hint</td><td>Hot internal branch with strict contract</td></tr>
+          <tr><td><code>assume_verified(cond)</code></td><td>After prior proof/check of the same condition</td><td>Fast path after <code>require(is_pow2(align))</code></td></tr>
+          <tr><td><code>unreachable()</code></td><td>Impossible control flow</td><td><code>default:</code> impossible enum branch</td></tr>
+        </tbody>
+      </table>
+      <p class="infobox"><strong>Bounded values:</strong> model dimensions/counts/alignment via <code>a::bounded</code> and <code>a::pow2_bounded</code> to move validation into type construction.</p>
+    </section>
+
+    <section class="section">
+      <h2>Context Strategy</h2>
+      <p>A practical pattern is to keep two levels:</p>
+      <ul>
+        <li>local <code>sum_req</code>/<code>layout</code> for simultaneously alive components;</li>
+        <li>global <code>max_req</code> for peak memory across exclusive contexts.</li>
+      </ul>
+      <div class="code"><pre><code>using boot = a::sum_req&lt;font_phase, image_phase&gt;;
+using game = a::sum_req&lt;renderer_state, ui_state&gt;;
+using app_peak = a::max_req&lt;boot, game&gt;;</code></pre></div>
+      <p class='code-note'>This pattern separates local simultaneous layouts (<code>sum_req</code>) from global peak planning (<code>max_req</code>) for deterministic reuse.<br><strong>Plain example:</strong> inside one phase you sum required blocks, across different phases you keep only the larger peak.</p>
+    </section>
+
+    <footer class="foot">
+      Continue with <a href="two-pass-guide.html">Two Pass Guide</a> and <a href="recipes.html">Recipes</a>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
+

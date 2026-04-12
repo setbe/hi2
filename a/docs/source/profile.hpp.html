@@ -1,0 +1,164 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: profile.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<header class="top"><div class="wrap"><div class="brand brand-switch"><select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs"><option value="a">a::</option><option value="b">b::</option><option value="c">c::</option><option value="d">d::</option></select><span class="brand-tail">source</span></div><nav class="nav"><a href="../index.html">Overview</a><a href="../modules.html">Modules</a><a href="../api-atlas.html">API Atlas</a><a href="index.html">Source Index</a></nav><div class="lang-switch" aria-label="Language selector"><a class="flag active" href="profile.hpp.html" title="English" lang="en">EN</a><a class="flag" href="../uk/source/profile.hpp.html" title="Ukrainian" lang="uk">UK</a></div></div></header>
+<main class="wrap"><section class="hero"><h1>profile.hpp</h1><p><span class="pill ok">public</span></p><p class="src-path">Path: <code>a/profile.hpp</code></p></section><section class="section"><div class="code"><pre><code>#pragma once
+
+#include &quot;config.hpp&quot;
+#include &quot;types.hpp&quot;
+
+namespace a {
+namespace profile {
+enum class level : u8 {
+    strict = 0,
+    audit,
+    lean
+};
+
+struct settings {
+    bool check_require;
+    bool check_ensure;
+    bool check_invariant;
+    bool check_assume;
+    bool emit_assume_hint;
+};
+
+template&lt;level Level&gt;
+struct preset;
+
+template&lt;&gt;
+struct preset&lt;level::strict&gt; {
+    static A_CONSTEXPR settings value() noexcept {
+        return settings{true, true, true, true, true};
+    }
+};
+
+template&lt;&gt;
+struct preset&lt;level::audit&gt; {
+    // Audit mode keeps full contract checking but suppresses optimizer assumptions.
+    static A_CONSTEXPR settings value() noexcept {
+        return settings{true, true, true, true, false};
+    }
+};
+
+template&lt;&gt;
+struct preset&lt;level::lean&gt; {
+    // Lean mode keeps API/precondition checks; internal/post checks are trimmed.
+    static A_CONSTEXPR settings value() noexcept {
+        return settings{true, false, false, true, true};
+    }
+};
+
+#if defined(A_PROFILE_STRICT)
+#  define A_PROFILE_SELECTED_STRICT 1
+#else
+#  define A_PROFILE_SELECTED_STRICT 0
+#endif
+
+#if defined(A_PROFILE_AUDIT)
+#  define A_PROFILE_SELECTED_AUDIT 1
+#else
+#  define A_PROFILE_SELECTED_AUDIT 0
+#endif
+
+#if defined(A_PROFILE_LEAN)
+#  define A_PROFILE_SELECTED_LEAN 1
+#else
+#  define A_PROFILE_SELECTED_LEAN 0
+#endif
+
+static_assert((A_PROFILE_SELECTED_STRICT + A_PROFILE_SELECTED_AUDIT + A_PROFILE_SELECTED_LEAN) &lt;= 1,
+              &quot;a::profile: define at most one of A_PROFILE_STRICT, A_PROFILE_AUDIT, A_PROFILE_LEAN&quot;);
+
+#if A_PROFILE_SELECTED_LEAN
+static A_CONSTEXPR_VAR level current_level = level::lean;
+#elif A_PROFILE_SELECTED_AUDIT
+static A_CONSTEXPR_VAR level current_level = level::audit;
+#else
+static A_CONSTEXPR_VAR level current_level = level::strict;
+#endif
+
+// Global default profile for the current build.
+// Use a::contract::*_as&lt;profile::level::...&gt;() when a subsystem needs an explicit level.
+A_NODISCARD A_CONSTEXPR settings current() noexcept {
+    return preset&lt;current_level&gt;::value();
+}
+
+static_assert(preset&lt;level::strict&gt;::value().check_require,
+              &quot;a::profile: strict profile must keep require checks enabled&quot;);
+static_assert(preset&lt;level::audit&gt;::value().check_require,
+              &quot;a::profile: audit profile must keep require checks enabled&quot;);
+static_assert(preset&lt;level::lean&gt;::value().check_require,
+              &quot;a::profile: lean profile must keep require checks enabled&quot;);
+static_assert(preset&lt;level::strict&gt;::value().check_assume,
+              &quot;a::profile: strict profile must keep assume checks enabled&quot;);
+static_assert(preset&lt;level::audit&gt;::value().check_assume,
+              &quot;a::profile: audit profile must keep assume checks enabled&quot;);
+static_assert(preset&lt;level::lean&gt;::value().check_assume,
+              &quot;a::profile: lean profile must keep assume checks enabled&quot;);
+
+A_NODISCARD A_CONSTEXPR bool contracts_enabled() noexcept {
+    const settings s = current();
+    return s.check_require || s.check_ensure || s.check_invariant || s.check_assume ||
+           s.emit_assume_hint;
+}
+
+#undef A_PROFILE_SELECTED_STRICT
+#undef A_PROFILE_SELECTED_AUDIT
+#undef A_PROFILE_SELECTED_LEAN
+} // namespace profile
+} // namespace a
+</code></pre></div></section><footer class="foot"><a href="index.html">Back to Source Index</a></footer></main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+  function splitPath(path) { return path.split('/').filter(function (s) { return s.length > 0; }); }
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') { projectIndex = i; break; }
+  }
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+  var prefix = '/';
+  if (projectIndex > 0) { prefix = '/' + segments.slice(0, projectIndex).join('/') + '/'; }
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) { window.location.href = preferred; return; }
+    } catch (e) {}
+    window.location.href = fallbackUrl(project);
+  }
+  select.addEventListener('change', function (e) { switchProject(e.target.value); });
+})();
+</script>
+</body>
+</html>

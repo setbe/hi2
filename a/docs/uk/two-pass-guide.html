@@ -1,0 +1,218 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: Two Pass Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">two pass guide</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Огляд</a>
+        <a href="modules.html">Модулі</a>
+        <a href="api-atlas.html">API Атлас</a>
+        <a href="memory-model.html">Модель Пам'яті</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Крипто</a>
+        <a href="recipes.html">Рецепти</a>
+        <a href="source/index.html">Код</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag" href="../two-pass-guide.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag active" href="two-pass-guide.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1><code>a::two_pass</code> Protocol Guide</h1>
+      <p>
+        <code>a::two_pass</code> — це дисципліна планування, а не просто ще один API.
+        Спочатку рахуємо і валідуємо вимоги, потім будуємо результат у заданій arena,
+        без випадкових алокацій і розмитих error-сигналів.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Core Types</h2>
+      <table>
+        <thead><tr><th>Type</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code>a::two_pass::plan_result&lt;Plan&gt;</code></td><td><code>status code</code> + <code>Plan plan</code> + <code>memory_req memory</code></td></tr>
+          <tr><td><code>a::two_pass::build_result&lt;Output&gt;</code></td><td><code>status code</code> + <code>Output value</code></td></tr>
+          <tr><td><code>a::two_pass::build_result&lt;void&gt;</code></td><td>Build-only статус без payload</td></tr>
+          <tr><td><code>a::two_pass::traits&lt;Plan,Input&gt;</code></td><td>Customization point для конкретних модулів</td></tr>
+          <tr><td><code>a::two_pass::static_req&lt;Bytes,Align&gt;</code></td><td>Leaf-контракт із compile-time розміром</td></tr>
+          <tr><td><code>a::two_pass::scope&lt;Ts...&gt;</code></td><td>Обгортка над <code>a::typed_scope&lt;a::layout&lt;Ts...&gt;&gt;</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>How to implement module-level two-pass</h2>
+      <div class="code"><pre><code>struct image_input {
+    a::byte_view encoded;
+    a::u32 max_w;
+    a::u32 max_h;
+};
+
+struct image_plan {
+    a::u32 width;
+    a::u32 height;
+    a::memory_req scratch;
+};
+
+struct image_output {
+    a::byte_view pixels;
+};
+
+namespace a::two_pass {
+template&lt;&gt;
+struct traits&lt;image_plan, image_input&gt; {
+    static plan_result&lt;image_plan&gt; plan(const image_input& in) noexcept;
+    static build_result&lt;image_output&gt; build(const image_plan& p,
+                                             a::arena_view arena,
+                                             a::byte_view out_pixels) noexcept;
+};
+}</code></pre></div>
+      <p class='code-note'>Це каркас протоколу: <code>plan()</code> валідовує вхід і форму пам'яті, а <code>build()</code> будує результат лише за затвердженим планом.<br><strong>На пальцях:</strong> спочатку перевірив заголовок PNG і порахував scratch, потім уже декодуєш.</p>
+    </section>
+
+    <section class="section">
+      <h2>Status Discipline</h2>
+      <ul>
+        <li>Не зводь помилки до <code>bool</code>: повертай <code>a::status</code>.</li>
+        <li>Брак пам'яті сигналізуй через <code>status::insufficient_memory</code>.</li>
+        <li>Порушення контракту: <code>invalid_input</code>, <code>mismatch</code>, <code>overflow</code>.</li>
+        <li>Помилки декодера/бекенда: <code>unsupported</code> або <code>backend_failure</code>.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Composition Helpers</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Static components</h3>
+          <div class="code"><pre><code>using req = a::sum_req&lt;
+    a::two_pass::static_req&lt;4096, 16&gt;,
+    a::two_pass::static_req&lt;8192, 16&gt;
+&gt;;</code></pre></div>
+      <p class='code-note'>Тут збирається повністю статичний bundle вимог, де розмір і вирівнювання відомі ще до запуску.<br><strong>На пальцях:</strong> поєднав 4 КБ і 8 КБ блоки і ще до запуску знаєш, який мінімум пам'яті потрібен.</p>
+        </article>
+        <article class="card">
+          <h3>Context selection</h3>
+          <div class="code"><pre><code>using boot = a::sum_req&lt;font_plan, atlas_build&gt;;
+using run  = a::sum_req&lt;frame_state, ui_state&gt;;
+using peak = a::max_req&lt;boot, run&gt;;</code></pre></div>
+      <p class='code-note'>Цей приклад поєднує два контексти й обчислює один піковий memory-контракт для взаємовиключного виконання.<br><strong>На пальцях:</strong> меню просить 24 КБ, гра 80 КБ, значить одна арена на 80 КБ достатня.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Contract Checklist</h2>
+      <ul>
+        <li>Plan-фаза не модифікує user buffers.</li>
+        <li>Build-фаза не виходить за межі memory, зафіксовані у плані.</li>
+        <li>Тимчасові буфери живуть у <code>a::arena_view</code> і мають контрольований lifetime.</li>
+        <li>Секрети в crypto-шляхах очищаються через wipe helper.</li>
+        <li>Публічний API не містить platform/OS типів.</li>
+      </ul>
+    </section>
+
+    <footer class="foot">
+      Пов'язані сторінки: <a href="memory-model.html">Модель Пам'яті</a>, <a href="recipes.html">Рецепти</a>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+

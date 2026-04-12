@@ -1,0 +1,323 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: config.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">source</span>
+      </div>
+      <nav class="nav">
+        <a href="../index.html">Огляд</a>
+        <a href="../modules.html">Модулі</a>
+        <a href="../api-atlas.html">API Атлас</a>
+        <a href="index.html">Індекс Коду</a>
+      </nav>      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag" href="../../source/config.hpp.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag active" href="config.hpp.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>config.hpp</h1>
+      <p><span class="pill ok">public</span></p>
+      <p class="src-path">Path: <code>a/config.hpp</code></p>
+    </section>
+    <section class="section">
+      <div class="code"><pre><code>#pragma once
+
+#if defined(_MSC_VER)
+#  define A_COMPILER_MSVC 1
+#else
+#  define A_COMPILER_MSVC 0
+#endif
+
+#if defined(__clang__)
+#  define A_COMPILER_CLANG 1
+#else
+#  define A_COMPILER_CLANG 0
+#endif
+
+#if defined(__GNUC__) &amp;&amp; !defined(__clang__)
+#  define A_COMPILER_GCC 1
+#else
+#  define A_COMPILER_GCC 0
+#endif
+
+#if defined(_M_IX86) || defined(__i386__)
+#  define A_ARCH_X86_32 1
+#else
+#  define A_ARCH_X86_32 0
+#endif
+
+#if defined(_M_X64) || defined(__x86_64__)
+#  define A_ARCH_X86_64 1
+#else
+#  define A_ARCH_X86_64 0
+#endif
+
+#if (A_ARCH_X86_32 || A_ARCH_X86_64)
+#  define A_ARCH_X86 1
+#else
+#  define A_ARCH_X86 0
+#endif
+
+#if defined(_M_ARM) || defined(__arm__)
+#  define A_ARCH_ARM32 1
+#else
+#  define A_ARCH_ARM32 0
+#endif
+
+#if defined(_M_ARM64) || defined(__aarch64__)
+#  define A_ARCH_ARM64 1
+#else
+#  define A_ARCH_ARM64 0
+#endif
+
+#if (A_ARCH_ARM32 || A_ARCH_ARM64)
+#  define A_ARCH_ARM 1
+#else
+#  define A_ARCH_ARM 0
+#endif
+
+#if (!A_ARCH_X86 &amp;&amp; !A_ARCH_ARM)
+#  define A_ARCH_UNKNOWN 1
+#else
+#  define A_ARCH_UNKNOWN 0
+#endif
+
+#if A_COMPILER_MSVC
+#  if defined(_MSVC_LANG)
+#    define A_CXX_VERSION _MSVC_LANG
+#  else
+#    define A_CXX_VERSION __cplusplus
+#  endif
+#else
+#  define A_CXX_VERSION __cplusplus
+#endif
+
+#if A_CXX_VERSION &gt;= 201703L
+#  define A_CXX_17 1
+#else
+#  define A_CXX_17 0
+#endif
+
+#if A_CXX_VERSION &gt;= 202002L
+#  define A_CXX_20 1
+#else
+#  define A_CXX_20 0
+#endif
+
+#if defined(__cpp_char8_t) &amp;&amp; (__cpp_char8_t &gt;= 201811L)
+#  define A_HAS_CHAR8_T 1
+#else
+#  define A_HAS_CHAR8_T 0
+#endif
+
+#if defined(__SIZEOF_INT128__)
+#  define A_HAS_INT128 1
+#else
+#  define A_HAS_INT128 0
+#endif
+
+// MSVC targets supported by this project are treated as little-endian.
+#if A_COMPILER_MSVC
+#  define A_ENDIAN_LITTLE 1
+#  define A_ENDIAN_BIG 0
+#elif defined(__BYTE_ORDER__) &amp;&amp; defined(__ORDER_LITTLE_ENDIAN__) &amp;&amp; (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#  define A_ENDIAN_LITTLE 1
+#  define A_ENDIAN_BIG 0
+#elif defined(__BYTE_ORDER__) &amp;&amp; defined(__ORDER_BIG_ENDIAN__) &amp;&amp; (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#  define A_ENDIAN_LITTLE 0
+#  define A_ENDIAN_BIG 1
+#else
+#  define A_ENDIAN_LITTLE 0
+#  define A_ENDIAN_BIG 0
+#endif
+
+#if A_CXX_VERSION &lt; 202302L
+#  ifndef A_RESTRICT
+#    if defined(__GNUC__)
+#      define A_RESTRICT __restrict__
+#    elif A_COMPILER_MSVC
+#      define A_RESTRICT __restrict
+#    else
+#      define A_RESTRICT
+#    endif
+#  endif
+#else
+#  ifndef A_RESTRICT
+#    define A_RESTRICT
+#  endif
+#endif
+
+#if A_CXX_17
+#  ifndef A_NODISCARD
+#    define A_NODISCARD [[nodiscard]]
+#  endif
+#  ifndef A_CONSTEXPR
+#    define A_CONSTEXPR constexpr
+#  endif
+#  ifndef A_CONSTEXPR_VAR
+#    define A_CONSTEXPR_VAR constexpr
+#  endif
+#else
+#  ifndef A_NODISCARD
+#    define A_NODISCARD
+#  endif
+#  ifndef A_CONSTEXPR
+#    define A_CONSTEXPR inline
+#  endif
+#  ifndef A_CONSTEXPR_VAR
+#    define A_CONSTEXPR_VAR const
+#  endif
+#endif
+
+#if !defined(A_FORCE_INLINE)
+#  if A_COMPILER_MSVC
+#    define A_FORCE_INLINE __forceinline
+#  elif A_COMPILER_CLANG || A_COMPILER_GCC
+#    define A_FORCE_INLINE inline __attribute__((always_inline))
+#  else
+#    define A_FORCE_INLINE inline
+#  endif
+#endif
+
+#if !defined(A_NOINLINE)
+#  if A_COMPILER_MSVC
+#    define A_NOINLINE __declspec(noinline)
+#  elif A_COMPILER_CLANG || A_COMPILER_GCC
+#    define A_NOINLINE __attribute__((noinline))
+#  else
+#    define A_NOINLINE
+#  endif
+#endif
+
+#if !defined(A_ALIGNAS)
+#  define A_ALIGNAS(N) alignas(N)
+#endif
+
+#if !defined(A_CACHELINE)
+// Conservative default cache line size used by many desktop/server CPUs.
+// Can be overridden per target/toolchain when needed.
+#  define A_CACHELINE 64
+#endif
+
+#if !defined(A_LIKELY)
+#  if A_COMPILER_CLANG || A_COMPILER_GCC
+#    define A_LIKELY(x) __builtin_expect(!!(x), 1)
+#  else
+#    define A_LIKELY(x) (x)
+#  endif
+#endif
+
+#if !defined(A_UNLIKELY)
+#  if A_COMPILER_CLANG || A_COMPILER_GCC
+#    define A_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#  else
+#    define A_UNLIKELY(x) (x)
+#  endif
+#endif
+
+#if !defined(A_FALLTHROUGH)
+#  if A_CXX_17
+#    define A_FALLTHROUGH [[fallthrough]]
+#  elif A_COMPILER_CLANG || A_COMPILER_GCC
+#    define A_FALLTHROUGH __attribute__((fallthrough))
+#  else
+#    define A_FALLTHROUGH ((void)0)
+#  endif
+#endif
+</code></pre></div>
+    </section>
+    <footer class="foot">
+      <a href="index.html">Назад до Індексу Коду</a>
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+

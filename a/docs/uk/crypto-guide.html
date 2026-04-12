@@ -1,0 +1,198 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: Crypto Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">crypto guide</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Огляд</a>
+        <a href="modules.html">Модулі</a>
+        <a href="api-atlas.html">API Атлас</a>
+        <a href="memory-model.html">Модель Пам'яті</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Крипто</a>
+        <a href="recipes.html">Рецепти</a>
+        <a href="source/index.html">Код</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag" href="../crypto-guide.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag active" href="crypto-guide.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1><code>a::crypto</code> Guide</h1>
+      <p>
+        Криптографія в <code>a::crypto</code> спроєктована в стилі "нічого зайвого":
+        жодної залежності від ОС, жодного прихованого heap, лише чіткий API над caller-owned буферами.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Algorithms and Headers</h2>
+      <table>
+        <thead><tr><th>Header</th><th>Type</th><th>Main Operations</th></tr></thead>
+        <tbody>
+          <tr><td><code>a/crypto/sha256.hpp</code></td><td><code>a::crypto::sha256</code></td><td><code>update</code>, <code>final</code>, <code>reset</code>, static <code>hmac</code></td></tr>
+          <tr><td><code>a/crypto/sha384.hpp</code></td><td><code>a::crypto::sha384</code></td><td><code>update</code>, <code>final</code>, <code>reset</code>, static <code>hmac</code></td></tr>
+          <tr><td><code>a/crypto/chacha20.hpp</code></td><td><code>a::crypto::chacha20</code></td><td><code>init</code>, <code>keystream</code>, <code>encrypt</code>, <code>encrypt_inplace</code>, <code>wipe</code></td></tr>
+          <tr><td><code>a/crypto/poly1305.hpp</code></td><td><code>a::crypto::poly1305</code></td><td><code>init</code>, <code>update</code>, <code>final</code>, constant-time compare helpers</td></tr>
+          <tr><td><code>a/crypto/aead_chacha20_poly1305.hpp</code></td><td><code>a::crypto::aead_chacha20_poly1305</code></td><td><code>seal</code>, <code>open</code>, RFC 8439 MAC path</td></tr>
+          <tr><td><code>a/crypto/x25519.hpp</code></td><td><code>a::crypto::x25519</code></td><td><code>generate_public</code>, <code>shared_secret</code>, <code>ct_equal32</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Design Rules</h2>
+      <ul>
+        <li>Секрети живуть у зовнішніх буферах; бібліотека не тримає приховані heap-контейнери.</li>
+        <li>Поток даних іде через <code>a::byte_view</code>/<code>a::view</code>-подібні інтерфейси.</li>
+        <li>Ключі й чутливий state очищаються через <code>crypto/detail/wipe.hpp</code>.</li>
+        <li>Порівняння критичних буферів робиться константно-часово через <code>crypto/detail/ct.hpp</code>.</li>
+        <li>LE/BE доступ централізований у <code>crypto/detail/load_store.hpp</code> поверх <code>a::bit</code>.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Recommended Usage Pattern</h2>
+      <div class="code"><pre><code>a::crypto::aead_chacha20_poly1305::key key{};
+a::crypto::aead_chacha20_poly1305::nonce nonce{};
+a::byte_view aad = ...;
+a::byte_view plaintext = ...;
+a::byte_view ciphertext = ...;
+a::byte_view tag = ...;
+
+const bool ok_seal = a::crypto::aead_chacha20_poly1305::seal(
+    key, nonce, aad, plaintext, ciphertext, tag
+);
+
+const bool ok_open = a::crypto::aead_chacha20_poly1305::open(
+    key, nonce, aad, ciphertext, tag, plaintext
+);
+if (!ok_open) {
+    // authentication failed
+}</code></pre></div>
+      <p class='code-note'>Послідовність така: <code>seal</code> з key+nonce+AAD дає ciphertext/tag, <code>open</code> перевіряє їх; помилка означає провал автентифікації.<br><strong>На пальцях:</strong> якщо в пакеті змінився хоч один байт, <code>open()</code> поверне помилку і plaintext не приймається.</p>
+    </section>
+
+    <section class="section">
+      <h2>Integration with <code>a::two_pass</code></h2>
+      <p>
+        У складних пайплайнах (batch verification, handshake phases, asset protection)
+        криптокроки зручно формалізувати як <code>plan/build</code> етапи,
+        а тимчасову пам'ять керувати через <code>a::typed_scope</code>.
+      </p>
+      <p class="infobox"><strong>Практика:</strong> тримай ключі в найкоротшому можливому scope і зануляй одразу після використання.</p>
+    </section>
+
+    <section class="section">
+      <h2>Security Notes</h2>
+      <ul>
+        <li>Не повторюй nonce для ChaCha20-Poly1305.</li>
+        <li>Перевіряй MAC/tag до того, як вважати plaintext довіреним.</li>
+        <li>Уникай зайвих копій секретних буферів; in-place обробка зазвичай краща.</li>
+        <li>Unsafe escape hatch використовуйте лише там, де контракт реально контрольований.</li>
+      </ul>
+    </section>
+
+    <footer class="foot">
+      Далі: <a href="source/index.html">Source Reference</a> і <a href="two-pass-guide.html">Two Pass Guide</a>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+

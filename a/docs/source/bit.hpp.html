@@ -1,0 +1,433 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: bit.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">source</span>
+      </div>
+      <nav class="nav">
+        <a href="../index.html">Overview</a>
+        <a href="../modules.html">Modules</a>
+        <a href="../api-atlas.html">API Atlas</a>
+        <a href="index.html">Source Index</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="bit.hpp.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="../uk/source/bit.hpp.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>bit.hpp</h1>
+      <p><span class="pill ok">public</span></p>
+      <p class="src-path">Path: <code>a/bit.hpp</code></p>
+    </section>
+    <section class="section">
+      <div class="code"><pre><code>#pragma once
+
+#include &quot;config.hpp&quot;
+#include &quot;types.hpp&quot;
+
+namespace a {
+enum class endian : u8 {
+    unknown = 0,
+    little = 1,
+    big = 2
+};
+
+A_NODISCARD A_CONSTEXPR endian native_endian() noexcept {
+#if A_ENDIAN_LITTLE
+    return endian::little;
+#elif A_ENDIAN_BIG
+    return endian::big;
+#else
+    return endian::unknown;
+#endif
+}
+
+A_NODISCARD A_CONSTEXPR u16 bswap16(u16 x) noexcept {
+    return static_cast&lt;u16&gt;((x &gt;&gt; 8) | (x &lt;&lt; 8));
+}
+
+A_NODISCARD A_CONSTEXPR u32 bswap32(u32 x) noexcept {
+    return ((x &amp; 0x000000FFu) &lt;&lt; 24) |
+           ((x &amp; 0x0000FF00u) &lt;&lt; 8) |
+           ((x &amp; 0x00FF0000u) &gt;&gt; 8) |
+           ((x &amp; 0xFF000000u) &gt;&gt; 24);
+}
+
+A_NODISCARD A_CONSTEXPR u64 bswap64(u64 x) noexcept {
+    return ((x &amp; 0x00000000000000FFull) &lt;&lt; 56) |
+           ((x &amp; 0x000000000000FF00ull) &lt;&lt; 40) |
+           ((x &amp; 0x0000000000FF0000ull) &lt;&lt; 24) |
+           ((x &amp; 0x00000000FF000000ull) &lt;&lt; 8) |
+           ((x &amp; 0x000000FF00000000ull) &gt;&gt; 8) |
+           ((x &amp; 0x0000FF0000000000ull) &gt;&gt; 24) |
+           ((x &amp; 0x00FF000000000000ull) &gt;&gt; 40) |
+           ((x &amp; 0xFF00000000000000ull) &gt;&gt; 56);
+}
+
+A_NODISCARD A_CONSTEXPR u16 byteswap(u16 x) noexcept { return bswap16(x); }
+A_NODISCARD A_CONSTEXPR u32 byteswap(u32 x) noexcept { return bswap32(x); }
+A_NODISCARD A_CONSTEXPR u64 byteswap(u64 x) noexcept { return bswap64(x); }
+
+A_NODISCARD A_CONSTEXPR u16 rotl16(u16 x, unsigned r) noexcept {
+    r &amp;= 15u;
+    return static_cast&lt;u16&gt;((x &lt;&lt; r) | (x &gt;&gt; ((16u - r) &amp; 15u)));
+}
+
+A_NODISCARD A_CONSTEXPR u32 rotl32(u32 x, unsigned r) noexcept {
+    r &amp;= 31u;
+    return static_cast&lt;u32&gt;((x &lt;&lt; r) | (x &gt;&gt; ((32u - r) &amp; 31u)));
+}
+
+A_NODISCARD A_CONSTEXPR u64 rotl64(u64 x, unsigned r) noexcept {
+    r &amp;= 63u;
+    return static_cast&lt;u64&gt;((x &lt;&lt; r) | (x &gt;&gt; ((64u - r) &amp; 63u)));
+}
+
+A_NODISCARD A_CONSTEXPR u16 rotr16(u16 x, unsigned r) noexcept {
+    r &amp;= 15u;
+    return static_cast&lt;u16&gt;((x &gt;&gt; r) | (x &lt;&lt; ((16u - r) &amp; 15u)));
+}
+
+A_NODISCARD A_CONSTEXPR u32 rotr32(u32 x, unsigned r) noexcept {
+    r &amp;= 31u;
+    return static_cast&lt;u32&gt;((x &gt;&gt; r) | (x &lt;&lt; ((32u - r) &amp; 31u)));
+}
+
+A_NODISCARD A_CONSTEXPR u64 rotr64(u64 x, unsigned r) noexcept {
+    r &amp;= 63u;
+    return static_cast&lt;u64&gt;((x &gt;&gt; r) | (x &lt;&lt; ((64u - r) &amp; 63u)));
+}
+
+template&lt;usize Bits&gt;
+struct bitset {
+    static_assert(Bits &gt; 0, &quot;bitset: Bits must be &gt; 0&quot;);
+
+    static A_CONSTEXPR_VAR usize word_bits = 64;
+    static A_CONSTEXPR_VAR usize word_count = (Bits + (word_bits - 1)) / word_bits;
+
+    u64 words[word_count] = {};
+
+    void clear() noexcept {
+        for (usize i = 0; i &lt; word_count; ++i) {
+            words[i] = 0;
+        }
+    }
+
+    A_NODISCARD bool test(usize idx) const noexcept {
+        if (idx &gt;= Bits) {
+            return false;
+        }
+        const usize w = idx / word_bits;
+        const usize b = idx % word_bits;
+        return (words[w] &amp; (u64(1) &lt;&lt; b)) != 0;
+    }
+
+    bool set(usize idx) noexcept {
+        if (idx &gt;= Bits) {
+            return false;
+        }
+        const usize w = idx / word_bits;
+        const usize b = idx % word_bits;
+        words[w] |= (u64(1) &lt;&lt; b);
+        return true;
+    }
+
+    bool reset(usize idx) noexcept {
+        if (idx &gt;= Bits) {
+            return false;
+        }
+        const usize w = idx / word_bits;
+        const usize b = idx % word_bits;
+        words[w] &amp;= ~(u64(1) &lt;&lt; b);
+        return true;
+    }
+
+    A_NODISCARD bool any() const noexcept {
+        for (usize i = 0; i &lt; word_count; ++i) {
+            if (words[i] != 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    A_NODISCARD usize count() const noexcept {
+        usize out = 0;
+        for (usize i = 0; i &lt; word_count; ++i) {
+            u64 x = words[i];
+            while (x != 0) {
+                x &amp;= (x - 1);
+                ++out;
+            }
+        }
+        return out;
+    }
+};
+
+template&lt;typename T&gt;
+A_NODISCARD static inline T load_le(const void* src) noexcept = delete;
+
+template&lt;typename T&gt;
+A_NODISCARD static inline T load_be(const void* src) noexcept = delete;
+
+template&lt;typename T&gt;
+static inline void store_le(void* dst, T v) noexcept = delete;
+
+template&lt;typename T&gt;
+static inline void store_be(void* dst, T v) noexcept = delete;
+
+template&lt;&gt;
+A_NODISCARD inline u8 load_le&lt;u8&gt;(const void* src) noexcept {
+    const u8* b = reinterpret_cast&lt;const u8*&gt;(src);
+    return b[0];
+}
+
+template&lt;&gt;
+A_NODISCARD inline u16 load_le&lt;u16&gt;(const void* src) noexcept {
+    const u8* b = reinterpret_cast&lt;const u8*&gt;(src);
+    return static_cast&lt;u16&gt;(static_cast&lt;u16&gt;(b[0]) | (static_cast&lt;u16&gt;(b[1]) &lt;&lt; 8));
+}
+
+template&lt;&gt;
+A_NODISCARD inline u32 load_le&lt;u32&gt;(const void* src) noexcept {
+    const u8* b = reinterpret_cast&lt;const u8*&gt;(src);
+    return static_cast&lt;u32&gt;(static_cast&lt;u32&gt;(b[0]) |
+                            (static_cast&lt;u32&gt;(b[1]) &lt;&lt; 8) |
+                            (static_cast&lt;u32&gt;(b[2]) &lt;&lt; 16) |
+                            (static_cast&lt;u32&gt;(b[3]) &lt;&lt; 24));
+}
+
+template&lt;&gt;
+A_NODISCARD inline u64 load_le&lt;u64&gt;(const void* src) noexcept {
+    const u8* b = reinterpret_cast&lt;const u8*&gt;(src);
+    return static_cast&lt;u64&gt;(static_cast&lt;u64&gt;(b[0]) |
+                            (static_cast&lt;u64&gt;(b[1]) &lt;&lt; 8) |
+                            (static_cast&lt;u64&gt;(b[2]) &lt;&lt; 16) |
+                            (static_cast&lt;u64&gt;(b[3]) &lt;&lt; 24) |
+                            (static_cast&lt;u64&gt;(b[4]) &lt;&lt; 32) |
+                            (static_cast&lt;u64&gt;(b[5]) &lt;&lt; 40) |
+                            (static_cast&lt;u64&gt;(b[6]) &lt;&lt; 48) |
+                            (static_cast&lt;u64&gt;(b[7]) &lt;&lt; 56));
+}
+
+template&lt;&gt;
+A_NODISCARD inline u8 load_be&lt;u8&gt;(const void* src) noexcept {
+    const u8* b = reinterpret_cast&lt;const u8*&gt;(src);
+    return b[0];
+}
+
+template&lt;&gt;
+A_NODISCARD inline u16 load_be&lt;u16&gt;(const void* src) noexcept {
+    const u8* b = reinterpret_cast&lt;const u8*&gt;(src);
+    return static_cast&lt;u16&gt;((static_cast&lt;u16&gt;(b[0]) &lt;&lt; 8) | static_cast&lt;u16&gt;(b[1]));
+}
+
+template&lt;&gt;
+A_NODISCARD inline u32 load_be&lt;u32&gt;(const void* src) noexcept {
+    const u8* b = reinterpret_cast&lt;const u8*&gt;(src);
+    return static_cast&lt;u32&gt;((static_cast&lt;u32&gt;(b[0]) &lt;&lt; 24) |
+                            (static_cast&lt;u32&gt;(b[1]) &lt;&lt; 16) |
+                            (static_cast&lt;u32&gt;(b[2]) &lt;&lt; 8) |
+                            static_cast&lt;u32&gt;(b[3]));
+}
+
+template&lt;&gt;
+A_NODISCARD inline u64 load_be&lt;u64&gt;(const void* src) noexcept {
+    const u8* b = reinterpret_cast&lt;const u8*&gt;(src);
+    return static_cast&lt;u64&gt;((static_cast&lt;u64&gt;(b[0]) &lt;&lt; 56) |
+                            (static_cast&lt;u64&gt;(b[1]) &lt;&lt; 48) |
+                            (static_cast&lt;u64&gt;(b[2]) &lt;&lt; 40) |
+                            (static_cast&lt;u64&gt;(b[3]) &lt;&lt; 32) |
+                            (static_cast&lt;u64&gt;(b[4]) &lt;&lt; 24) |
+                            (static_cast&lt;u64&gt;(b[5]) &lt;&lt; 16) |
+                            (static_cast&lt;u64&gt;(b[6]) &lt;&lt; 8) |
+                            static_cast&lt;u64&gt;(b[7]));
+}
+
+template&lt;&gt;
+inline void store_le&lt;u8&gt;(void* dst, u8 v) noexcept {
+    u8* b = reinterpret_cast&lt;u8*&gt;(dst);
+    b[0] = v;
+}
+
+template&lt;&gt;
+inline void store_le&lt;u16&gt;(void* dst, u16 v) noexcept {
+    u8* b = reinterpret_cast&lt;u8*&gt;(dst);
+    b[0] = static_cast&lt;u8&gt;(v);
+    b[1] = static_cast&lt;u8&gt;(v &gt;&gt; 8);
+}
+
+template&lt;&gt;
+inline void store_le&lt;u32&gt;(void* dst, u32 v) noexcept {
+    u8* b = reinterpret_cast&lt;u8*&gt;(dst);
+    b[0] = static_cast&lt;u8&gt;(v);
+    b[1] = static_cast&lt;u8&gt;(v &gt;&gt; 8);
+    b[2] = static_cast&lt;u8&gt;(v &gt;&gt; 16);
+    b[3] = static_cast&lt;u8&gt;(v &gt;&gt; 24);
+}
+
+template&lt;&gt;
+inline void store_le&lt;u64&gt;(void* dst, u64 v) noexcept {
+    u8* b = reinterpret_cast&lt;u8*&gt;(dst);
+    b[0] = static_cast&lt;u8&gt;(v);
+    b[1] = static_cast&lt;u8&gt;(v &gt;&gt; 8);
+    b[2] = static_cast&lt;u8&gt;(v &gt;&gt; 16);
+    b[3] = static_cast&lt;u8&gt;(v &gt;&gt; 24);
+    b[4] = static_cast&lt;u8&gt;(v &gt;&gt; 32);
+    b[5] = static_cast&lt;u8&gt;(v &gt;&gt; 40);
+    b[6] = static_cast&lt;u8&gt;(v &gt;&gt; 48);
+    b[7] = static_cast&lt;u8&gt;(v &gt;&gt; 56);
+}
+
+template&lt;&gt;
+inline void store_be&lt;u8&gt;(void* dst, u8 v) noexcept {
+    u8* b = reinterpret_cast&lt;u8*&gt;(dst);
+    b[0] = v;
+}
+
+template&lt;&gt;
+inline void store_be&lt;u16&gt;(void* dst, u16 v) noexcept {
+    u8* b = reinterpret_cast&lt;u8*&gt;(dst);
+    b[0] = static_cast&lt;u8&gt;(v &gt;&gt; 8);
+    b[1] = static_cast&lt;u8&gt;(v);
+}
+
+template&lt;&gt;
+inline void store_be&lt;u32&gt;(void* dst, u32 v) noexcept {
+    u8* b = reinterpret_cast&lt;u8*&gt;(dst);
+    b[0] = static_cast&lt;u8&gt;(v &gt;&gt; 24);
+    b[1] = static_cast&lt;u8&gt;(v &gt;&gt; 16);
+    b[2] = static_cast&lt;u8&gt;(v &gt;&gt; 8);
+    b[3] = static_cast&lt;u8&gt;(v);
+}
+
+template&lt;&gt;
+inline void store_be&lt;u64&gt;(void* dst, u64 v) noexcept {
+    u8* b = reinterpret_cast&lt;u8*&gt;(dst);
+    b[0] = static_cast&lt;u8&gt;(v &gt;&gt; 56);
+    b[1] = static_cast&lt;u8&gt;(v &gt;&gt; 48);
+    b[2] = static_cast&lt;u8&gt;(v &gt;&gt; 40);
+    b[3] = static_cast&lt;u8&gt;(v &gt;&gt; 32);
+    b[4] = static_cast&lt;u8&gt;(v &gt;&gt; 24);
+    b[5] = static_cast&lt;u8&gt;(v &gt;&gt; 16);
+    b[6] = static_cast&lt;u8&gt;(v &gt;&gt; 8);
+    b[7] = static_cast&lt;u8&gt;(v);
+}
+
+A_NODISCARD static inline bool double_is_nan(double x) noexcept {
+    union {
+        double d;
+        u64 u;
+    } v{x};
+    const u64 exp = (v.u &gt;&gt; 52) &amp; 0x7FFull;
+    const u64 frac = v.u &amp; 0x000FFFFFFFFFFFFFull;
+    return (exp == 0x7FFull) &amp;&amp; (frac != 0);
+}
+
+A_NODISCARD static inline bool double_is_inf(double x) noexcept {
+    union {
+        double d;
+        u64 u;
+    } v{x};
+    const u64 exp = (v.u &gt;&gt; 52) &amp; 0x7FFull;
+    const u64 frac = v.u &amp; 0x000FFFFFFFFFFFFFull;
+    return (exp == 0x7FFull) &amp;&amp; (frac == 0);
+}
+} // namespace a
+</code></pre></div>
+    </section>
+    <footer class="foot">
+      <a href="index.html">Back to Source Index</a>
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,224 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: Recipes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">recipes</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Overview</a>
+        <a href="modules.html">Modules</a>
+        <a href="api-atlas.html">API Atlas</a>
+        <a href="memory-model.html">Memory Model</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Crypto</a>
+        <a href="recipes.html">Recipes</a>
+        <a href="source/index.html">Source</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="recipes.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="uk/recipes.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Practical Recipes</h1>
+      <p>Copy-ready templates for common patterns in <code>a::</code>.</p>
+    </section>
+
+    <section class="section">
+      <h2>1. Compile-time peak memory across contexts</h2>
+      <div class="code"><pre><code>struct boot_a { static constexpr a::memory_req requirement() noexcept { return {24 * 1024, 16}; } };
+struct boot_b { static constexpr a::memory_req requirement() noexcept { return {40 * 1024, 16}; } };
+struct run_a  { static constexpr a::memory_req requirement() noexcept { return {80 * 1024, 16}; } };
+struct run_b  { static constexpr a::memory_req requirement() noexcept { return {32 * 1024, 16}; } };
+
+using boot_ctx = a::sum_req&lt;boot_a, boot_b&gt;;
+using run_ctx  = a::sum_req&lt;run_a, run_b&gt;;
+using peak_ctx = a::max_req&lt;boot_ctx, run_ctx&gt;;
+
+constexpr a::memory_req app_req = peak_ctx::requirement();</code></pre></div>
+      <p class='code-note'>This computes a deterministic memory ceiling: each context is packed with <code>sum_req</code>, then global peak is selected with <code>max_req</code>.<br><strong>Plain example:</strong> boot may need 64 KB, gameplay 96 KB, so you allocate 96 KB once.</p>
+    </section>
+
+    <section class="section">
+      <h2>2. Typed slots with explicit construction</h2>
+      <div class="code"><pre><code>struct parser_state {
+    static constexpr a::memory_req requirement() noexcept { return {sizeof(parser_state), alignof(parser_state)}; }
+    parser_state() noexcept = default;
+    ~parser_state() noexcept = default;
+};
+
+using parser_layout = a::layout&lt;parser_state&gt;;
+
+void run_parser(a::arena_view arena) {
+    a::typed_scope&lt;parser_layout&gt; frame(arena);
+    if (!frame.active()) return;
+
+    parser_state* st = frame.construct&lt;parser_state&gt;();
+    if (!st) return;
+
+    // work
+
+    frame.destroy&lt;parser_state&gt;();
+    frame.release();
+}</code></pre></div>
+      <p class='code-note'>This recipe combines explicit and RAII cleanup: <code>destroy&lt;T&gt;()</code> destroys one concrete object immediately, while <code>release()</code> closes the frame and makes the scope inert.<br><strong>Plain example:</strong> you parse one file, call <code>destroy&lt;parser_state&gt;()</code> to end that object now, then call <code>release()</code> to close the whole scope; if you forget, <code>~typed_scope()</code> still runs <code>destroy_all()</code> as a safety fallback.</p>
+    </section>
+
+    <section class="section">
+      <h2>3. Reusable scratch with arena scope</h2>
+      <div class="code"><pre><code>void decode_batch(a::arena_view arena) {
+    {
+        a::scope phase(arena);
+        auto r = arena.alloc(48 * 1024, 16);
+        if (!a::is_ok(r.code)) return;
+        // decode image set A
+    } // rewind to phase mark
+
+    {
+        a::scope phase(arena);
+        auto r = arena.alloc(48 * 1024, 16);
+        if (!a::is_ok(r.code)) return;
+        // decode image set B using same bytes
+    }
+}</code></pre></div>
+      <p class='code-note'>Each inner <code>a::scope</code> rewinds arena offset automatically, so the same scratch bytes are safely reused between phases.<br><strong>Plain example:</strong> decode icon A, scope ends, then decode icon B into the same 48 KB region.</p>
+    </section>
+
+    <section class="section">
+      <h2>4. Two-pass module skeleton</h2>
+      <div class="code"><pre><code>namespace my {
+struct plan { a::u32 count; };
+struct input { a::u32 max_count; };
+struct output { a::u32 written; };
+}
+
+namespace a::two_pass {
+template&lt;&gt;
+struct traits&lt;my::plan, my::input&gt; {
+    static plan_result&lt;my::plan&gt; plan(const my::input& in) noexcept {
+        if (in.max_count == 0) return {status::invalid_input, {}, {}};
+        my::plan p{in.max_count};
+        return {status::ok, p, {in.max_count * sizeof(a::u32), alignof(a::u32)}};
+    }
+
+    static build_result&lt;my::output&gt; build(const my::plan& p, a::arena_view arena) noexcept {
+        auto r = arena.alloc(p.count * sizeof(a::u32), alignof(a::u32));
+        if (!is_ok(r.code)) return {r.code, {0}};
+        return {status::ok, {p.count}};
+    }
+};
+}</code></pre></div>
+      <p class='code-note'>This template shows a full two-pass contract: validate input in <code>plan()</code>, then allocate and produce output in <code>build()</code>.<br><strong>Plain example:</strong> first count rows and bytes for CSV, then allocate exactly that amount and write parsed rows.</p>
+    </section>
+
+    <section class="section">
+      <h2>5. Minimal crypto flow</h2>
+      <div class="code"><pre><code>a::crypto::sha256 h;
+h.update(data_a);
+h.update(data_b);
+a::crypto::sha256::digest d = h.final();
+
+// optionally reuse object
+h.reset();</code></pre></div>
+      <p class='code-note'>This is the minimal streaming hash pattern: update in chunks, finalize digest, optionally reset instance for reuse.<br><strong>Plain example:</strong> read a file in 4 KB chunks, feed each chunk to <code>update()</code>, then call <code>final()</code> once.</p>
+    </section>
+
+    <footer class="foot">
+      For more context see <a href="memory-model.html">Memory Model</a> and <a href="crypto-guide.html">Crypto Guide</a>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
+
+

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="860" viewBox="0 0 1400 860">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fffdf8"/>
+      <stop offset="100%" stop-color="#f5efe4"/>
+    </linearGradient>
+    <style>
+      .t{font-family:'IBM Plex Sans','Segoe UI',sans-serif;fill:#223044}
+      .h{font-family:'Space Grotesk','Segoe UI',sans-serif;font-weight:700;fill:#1a2736}
+      .box{fill:#ffffff;stroke:#d8ccb4;stroke-width:2}
+      .core{fill:#eef8f6;stroke:#7fb9ae}
+      .mem{fill:#fff4eb;stroke:#e2a77c}
+      .crypto{fill:#eef2fb;stroke:#9fb0da}
+      .line{stroke:#4b6476;stroke-width:2.2;marker-end:url(#arrow)}
+      .dash{stroke-dasharray:8 7}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#4b6476"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1400" height="860" fill="url(#bg)"/>
+  <text x="70" y="72" class="h" font-size="38">a:: Architecture Map</text>
+  <text x="70" y="106" class="t" font-size="20">Freestanding bare-metal core, deterministic memory model, crypto primitives</text>
+
+  <rect x="70" y="150" width="1240" height="180" rx="16" class="box core"/>
+  <text x="96" y="190" class="h" font-size="26">Core Utilities</text>
+  <text x="96" y="224" class="t" font-size="20">config.hpp • types.hpp • status.hpp • meta.hpp • utility.hpp • view.hpp • utf8.hpp • bit.hpp • math.hpp • charconv_base.hpp</text>
+  <text x="96" y="258" class="t" font-size="18">Role: compile-time traits, low-level primitives, views, endian/load/store, integer arithmetic</text>
+  <text x="96" y="286" class="t" font-size="18">Constraint: no OS headers, no syscalls, no allocator assumptions</text>
+
+  <rect x="70" y="370" width="1240" height="190" rx="16" class="box mem"/>
+  <text x="96" y="410" class="h" font-size="26">Deterministic Memory and Two-Pass Composition</text>
+  <text x="96" y="444" class="t" font-size="20">memory_req • req_sum • req_max • arena_view • scope • component_req • sum_req/max_req • layout • typed_scope</text>
+  <text x="96" y="478" class="t" font-size="18">Role: compile-time memory algebra + runtime scoped region with constructed-state tracking</text>
+  <text x="96" y="506" class="t" font-size="18">Invariant: active() defines usability; release() closes scope and makes it inert</text>
+  <text x="96" y="534" class="t" font-size="18">Safety: no-throw construction/destruction policy for typed_scope components</text>
+
+  <rect x="70" y="600" width="1240" height="190" rx="16" class="box crypto"/>
+  <text x="96" y="640" class="h" font-size="26">Crypto Layer</text>
+  <text x="96" y="674" class="t" font-size="20">sha256 • sha384 • chacha20 • poly1305 • aead_chacha20_poly1305 • x25519</text>
+  <text x="96" y="708" class="t" font-size="18">Role: size-safe APIs, caller-owned buffers, no heap, no OS dependencies</text>
+  <text x="96" y="736" class="t" font-size="18">Support: crypto/detail/{load_store, ct, wipe}</text>
+
+  <line x1="700" y1="330" x2="700" y2="370" class="line"/>
+  <line x1="700" y1="560" x2="700" y2="600" class="line"/>
+
+  <text x="1068" y="548" class="t" font-size="15">depends on</text>
+  <line x1="1178" y1="540" x2="1178" y2="600" class="line dash"/>
+</svg>

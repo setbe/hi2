@@ -1,0 +1,265 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>source: crypto/aead_chacha20_poly1305.hpp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">source</span>
+      </div>
+      <nav class="nav">
+        <a href="../index.html">Overview</a>
+        <a href="../modules.html">Modules</a>
+        <a href="../api-atlas.html">API Atlas</a>
+        <a href="index.html">Source Index</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="crypto__aead_chacha20_poly1305.hpp.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="../uk/source/crypto__aead_chacha20_poly1305.hpp.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>crypto/aead_chacha20_poly1305.hpp</h1>
+      <p><span class="pill ok">public</span></p>
+      <p class="src-path">Path: <code>a/crypto/aead_chacha20_poly1305.hpp</code></p>
+    </section>
+    <section class="section">
+      <div class="code"><pre><code>// RFC 8439: ChaCha20-Poly1305 AEAD
+#pragma once
+
+#include &quot;../a.hpp&quot;
+#include &quot;detail/load_store.hpp&quot;
+#include &quot;detail/wipe.hpp&quot;
+#include &quot;chacha20.hpp&quot;
+#include &quot;poly1305.hpp&quot;
+
+namespace a {
+namespace crypto {
+    struct aead_chacha20_poly1305 {
+        using u8 = a::u8;
+        using u32 = a::u32;
+        using u64 = a::u64;
+        using usize = a::usize;
+
+        using byte_view = a::byte_view;
+        using byte_view_mut = a::byte_view_mut;
+        template&lt;usize N&gt; using byte_view_n = a::byte_view_n&lt;N&gt;;
+        template&lt;usize N&gt; using byte_view_mut_n = a::byte_view_mut_n&lt;N&gt;;
+
+        // Constants
+        static A_CONSTEXPR_VAR usize KEY_BYTES = a::crypto::chacha20::KEY_BYTES;      // 32
+        static A_CONSTEXPR_VAR usize NONCE_BYTES = a::crypto::chacha20::NONCE_BYTES;  // 12
+        static A_CONSTEXPR_VAR usize TAG_BYTES = a::crypto::poly1305::TAG_BYTES;      // 16
+
+        static_assert(KEY_BYTES   == 32, &quot;aead: key is 32 bytes&quot;);
+        static_assert(NONCE_BYTES == 12, &quot;aead: nonce is 12 bytes&quot;);
+        static_assert(TAG_BYTES   == 16, &quot;aead: tag is 16 bytes&quot;);
+
+        // RAII (no state; still keep for symmetry / future extension)
+        explicit A_CONSTEXPR aead_chacha20_poly1305() noexcept = default;
+        ~aead_chacha20_poly1305() noexcept = default;
+
+    private:
+        A_CONSTEXPR static usize pad16(usize n) noexcept {
+            const usize r = (n &amp; 15u);
+            return (r == 0u) ? 0u : (16u - r);
+        }
+
+        
+    public:
+        // --------------------------------------------------------------------
+        //                              Public API
+        // --------------------------------------------------------------------
+
+        // Build Poly1305 tag for AEAD (RFC 8439):
+        // tag = Poly1305( otk, aad || pad16 || ciphertext || pad16 || le64(aad_len) || le64(ct_len)
+        template&lt;usize NAAD, usize NPT&gt;
+        static void mac_rfc8439(byte_view_n&lt;KEY_BYTES&gt;   key,
+                                byte_view_n&lt;NONCE_BYTES&gt; nonce,
+                                byte_view_n&lt;NAAD&gt;        aad,
+                                byte_view_n&lt;NPT&gt;         ciphertext,
+                                byte_view_mut_n&lt;TAG_BYTES&gt; tag_out) noexcept {
+            u8 zeros16[16]{};
+            a::crypto::poly1305 p;
+
+            u8 otk[a::crypto::poly1305::OTKEY_BYTES]{};
+            a::crypto::poly1305::derive_otk_from_chacha20(key, nonce, a::as_view_mut(otk));
+            p.init(otk);
+
+            if (aad.len()) p.update(aad);
+            const usize pad_aad = pad16(aad.len());
+            if (pad_aad) p.update(a::byte_view{ zeros16, pad_aad });
+
+            if (ciphertext.len()) p.update(ciphertext);
+            const usize pad_ct = pad16(ciphertext.len());
+            if (pad_ct) p.update(a::byte_view{ zeros16, pad_ct });
+
+            u8 lens[16]{};
+            detail::store64_le(lens + 0, (u64)aad.len());
+            detail::store64_le(lens + 8, (u64)ciphertext.len());
+            p.update(a::as_view(lens));
+
+            p.final(tag_out);
+        }
+
+        // NOTE: seal/open support in-place operation (plaintext may alias ciphertext_out).
+        // Seal: encrypt plaintext -&gt; ciphertext, compute tag.
+        // ciphertext_out must be same size as plaintext.
+        template&lt;usize NAAD, usize NPT&gt;
+        static void seal(byte_view_n&lt;KEY_BYTES&gt;    key,
+                         byte_view_n&lt;NONCE_BYTES&gt;  nonce,
+                         byte_view_n&lt;NAAD&gt;         aad,
+                         byte_view_n&lt;NPT&gt;          plaintext,
+                         byte_view_mut_n&lt;NPT&gt;      ciphertext_out,
+                         byte_view_mut_n&lt;TAG_BYTES&gt; tag_out) noexcept {
+            // 1) Encrypt with counter=1
+            a::crypto::chacha20 c;
+            c.init(key, nonce, 1u);
+            c.encrypt(plaintext, ciphertext_out);
+            // 2) MAC over AAD/ciphertext per RFC 8439
+            mac_rfc8439(key, nonce, aad, a::as_view(ciphertext_out), tag_out);
+        }
+
+        template&lt;usize NAAD, usize NPT&gt;
+        static void seal(const u8(&amp;key)[KEY_BYTES],
+                         const u8(&amp;nonce)[NONCE_BYTES],
+                         const u8(&amp;aad)[NAAD],
+                         const u8(&amp;plaintext)[NPT],
+                         u8(&amp;ciphertext_out)[NPT],
+                         u8(&amp;tag_out)[TAG_BYTES]) noexcept {
+            seal(a::as_view(key), a::as_view(nonce),
+                 a::as_view(aad), a::as_view(plaintext),
+                 a::as_view_mut(ciphertext_out),
+                 a::as_view_mut(tag_out));
+        }
+
+        // Open: verify tag, then decrypt ciphertext -&gt; plaintext.
+        // Returns true if tag is valid.
+        template&lt;usize NAAD, usize NCT&gt;
+        A_NODISCARD static bool open(byte_view_n&lt;KEY_BYTES&gt;   key,
+                                      byte_view_n&lt;NONCE_BYTES&gt; nonce,
+                                      byte_view_n&lt;NAAD&gt;        aad,
+                                      byte_view_n&lt;NCT&gt;         ciphertext,
+                                      byte_view_n&lt;TAG_BYTES&gt;   tag,
+                                      byte_view_mut_n&lt;NCT&gt;     plaintext_out) noexcept {
+            // 1) Compute expected tag
+            u8 got[TAG_BYTES]{};
+            mac_rfc8439(key, nonce, aad, ciphertext, a::as_view_mut(got));
+
+            if (!a::crypto::poly1305::ct_equal(a::as_view(got), tag))
+                return false;
+
+            // 2) Decrypt with counter=1
+            a::crypto::chacha20 c;
+            c.init(key, nonce, 1u);
+            c.encrypt(ciphertext, plaintext_out);
+            return true;
+        }
+
+        template&lt;usize NAAD, usize NCT&gt;
+        A_NODISCARD static bool open(const u8(&amp;key)[KEY_BYTES],
+                                      const u8(&amp;nonce)[NONCE_BYTES],
+                                      const u8(&amp;aad)[NAAD],
+                                      const u8(&amp;ciphertext)[NCT],
+                                      const u8(&amp;tag)[TAG_BYTES],
+                                      u8(&amp;plaintext_out)[NCT]) noexcept {
+            return open(a::as_view(key), a::as_view(nonce),
+                        a::as_view(aad), a::as_view(ciphertext),
+                        a::as_view(tag), a::as_view_mut(plaintext_out));
+        }
+    }; // struct aead_chacha20_poly1305
+} // namespace crypto
+} // namespace a
+</code></pre></div>
+    </section>
+    <footer class="foot">
+      <a href="index.html">Back to Source Index</a>
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
+
