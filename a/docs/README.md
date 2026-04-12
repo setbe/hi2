@@ -18,6 +18,7 @@ This directory contains a static HTML documentation site for the `a/` subrepo an
 - `two-pass-guide.html` - `a::two_pass` protocol guide
 - `crypto-guide.html` - crypto layer guide and safety notes
 - `recipes.html` - practical usage templates
+- `cpp-knowledge.html` - required C++ knowledge (iceberg onboarding for bare-metal)
 - `source/index.html` - source reference for each header
 
 ## Local Run

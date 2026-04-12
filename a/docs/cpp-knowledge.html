@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a:: C++ Knowledge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">bare-metal docs</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Overview</a>
+        <a href="modules.html">Modules</a>
+        <a href="api-atlas.html">API Atlas</a>
+        <a href="memory-model.html">Memory Model</a>
+        <a href="two-pass-guide.html">Two Pass</a>
+        <a href="crypto-guide.html">Crypto</a>
+        <a href="recipes.html">Recipes</a>
+        <a href="cpp-knowledge.html">C++ Knowledge</a>
+        <a href="source/index.html">Source</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="cpp-knowledge.html" title="English" lang="en">🇬🇧</a>
+        <a class="flag" href="uk/cpp-knowledge.html" title="Українська" lang="uk">🇺🇦</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Required C++ Knowledge for Starting with Bare-Metal</h1>
+      <p>
+        This chapter is written as a technical onboarding book, not as a checklist.
+        We start from familiar C++ ground and descend into the deeper ideas that power <code>a::</code>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Preflight Vocabulary (Read Before Everything Else)</h2>
+      <p>
+        These words appear across <code>a/</code>. Read them first, so later sections feel natural.
+      </p>
+      <table>
+        <thead><tr><th>Term</th><th>Precise Meaning</th><th>Plain Interpretation</th></tr></thead>
+        <tbody>
+          <tr><td><code>Compilation</code></td><td>Source code is translated into object code.</td><td>The compiler turns C++ text into machine-ready pieces.</td></tr>
+          <tr><td><code>Linking</code></td><td>Object files are connected into one final binary.</td><td>The linker joins all puzzle pieces into one executable image.</td></tr>
+          <tr><td><code>Execution</code></td><td>The CPU runs the final machine code.</td><td>This is the moment your program actually lives.</td></tr>
+          <tr><td><code>Lifetime</code></td><td>Interval where an object is valid and legally usable.</td><td>From birth (construction) to death (destruction).</td></tr>
+          <tr><td><code>Ownership</code></td><td>Responsibility for releasing/cleaning a resource.</td><td>Who must close, free, or rewind.</td></tr>
+          <tr><td><code>Alignment</code></td><td>Address constraint for a type (for example, multiple of 4 or 16).</td><td>Some data must start on specific address boundaries.</td></tr>
+          <tr><td><code>Padding</code></td><td>Extra bytes inserted to satisfy alignment/layout rules.</td><td>Invisible spacer bytes inside structs.</td></tr>
+          <tr><td><code>Memory frame</code></td><td>A marked sub-lifetime inside an arena.</td><td>A checkpoint in memory allocation progress.</td></tr>
+          <tr><td><code>Rewind</code></td><td>Reset arena cursor back to a saved mark.</td><td>Return to checkpoint and drop temporary allocations at once.</td></tr>
+        </tbody>
+      </table>
+      <p class="infobox"><strong>Reading rule:</strong> every deeper concept below is built from these nine words.</p>
+    </section>
+
+    <section class="section">
+      <h2>Iceberg Level 1: Compile, Link, Execute</h2>
+      <p>
+        In this architecture, compile-time is not a side topic: it is part of correctness.
+        We deliberately move many decisions to compile-time because deterministic systems benefit from early guarantees.
+      </p>
+      <div class="code"><pre><code>constexpr a::u32 kib(a::u32 n) noexcept { return n * 1024u; }
+
+constexpr a::u32 boot_pool = kib(64); // compile-time evaluation
+
+a::u32 user_pages = 3;
+a::u32 runtime_pool = kib(user_pages); // runtime evaluation</code></pre></div>
+      <p class="code-note">
+        <strong>Key point:</strong> <code>constexpr</code> means "can be compile-time", not "must be compile-time".
+        The same function may execute in either stage.
+        <br><strong>On fingers:</strong> known now -> compiler computes it. Known later -> CPU computes it.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Iceberg Level 2: Lifetime and Ownership (Why RAII Is a Foundation)</h2>
+      <p>
+        <code>a::</code> uses explicit memory contracts and deterministic cleanup.
+        RAII is the mechanism that makes this reliable under early-return, errors, and refactors.
+      </p>
+      <div class="code"><pre><code>void parse_phase(a::arena_view&amp; arena) {
+    a::scope frame(arena); // acquires a memory frame mark
+    // temporary allocations and objects
+} // destructor rewinds: frame ownership ends here</code></pre></div>
+      <p class="code-note">
+        <strong>Technical view:</strong> lifetime and ownership are coupled: whoever owns the frame ends its lifetime.
+        <br><strong>On fingers:</strong> open a workbench, do temporary work, close the bench, reset the table.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Iceberg Level 3: Pointers, Runtime Size, and Compile-Time Size</h2>
+      <p>
+        Pointer-based APIs are flexible but weakly constrained.
+        A pointer carries address, not element count, and never the semantic contract of the data.
+      </p>
+      <div class="code"><pre><code>a::u8 raw[256]{};
+a::usize n = 128;
+a::view&lt;a::u8&gt; dyn{raw, n}; // runtime-sized view</code></pre></div>
+      <p>
+        This is one reason "just use <code>std::vector</code>" does not solve deterministic protocol shape:
+        vector size is runtime state, while many cryptographic and binary contracts are fixed by specification.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Iceberg Level 4: What a View Really Is (<code>view&lt;T&gt;</code> vs <code>view_n&lt;T,N&gt;</code>)</h2>
+      <p>
+        A view is a non-owning window into already existing storage.
+        In <code>a/</code>, this distinction is central:
+        runtime-sized view for dynamic data, compile-time-sized view for fixed contracts.
+      </p>
+      <div class="code"><pre><code>a::u8 key[32]{};
+a::u8 nonce[12]{};
+a::u8 tag[16]{};
+
+a::byte_view_n&lt;32&gt; key_v = a::as_view(key);
+a::byte_view_n&lt;12&gt; nonce_v = a::as_view(nonce);
+a::byte_view_mut_n&lt;16&gt; tag_v = a::as_view_mut(tag);</code></pre></div>
+      <p class="code-note">
+        <strong>Why this is size-safe:</strong> the size is encoded in the type itself.
+        A wrong-sized buffer does not quietly "sort of work" - it fails at the type boundary.
+        <br><strong>Real usage:</strong> <code>a::crypto::x25519</code> and <code>a::crypto::aead_chacha20_poly1305</code> use fixed-size views for keys/nonces/tags.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Type Primer Before Layout Math: C++ Types vs <code>a::</code> Types</h2>
+      <p>
+        Before we discuss padding and alignment, we must lock the type vocabulary.
+        In this project, <code>a::</code> names are explicit aliases over core C++ integral types.
+      </p>
+      <table>
+        <thead><tr><th><code>a::</code> Type</th><th>C++ Underlying Type</th><th>Typical Role in a::</th></tr></thead>
+        <tbody>
+          <tr><td><code>a::u8</code></td><td><code>unsigned char</code></td><td>Raw bytes, binary buffers, crypto blocks.</td></tr>
+          <tr><td><code>a::u16</code></td><td><code>unsigned short</code></td><td>Compact counters/fields.</td></tr>
+          <tr><td><code>a::u32</code></td><td><code>unsigned int</code></td><td>Sizes, counters, protocol words.</td></tr>
+          <tr><td><code>a::u64</code></td><td><code>unsigned long long</code></td><td>Large counters, wide arithmetic.</td></tr>
+          <tr><td><code>a::usize</code></td><td><code>decltype(sizeof(0))</code></td><td>Object sizes and byte counts in memory APIs.</td></tr>
+          <tr><td><code>a::isize</code></td><td><code>ptrdiff-like signed size</code></td><td>Pointer differences and signed offsets.</td></tr>
+        </tbody>
+      </table>
+      <p class="code-note">
+        <strong>Why aliases matter:</strong> they make contracts readable at API boundaries.
+        <br><strong>On fingers:</strong> <code>a::u8</code> says "byte-level intent", not just "some integer".
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Iceberg Level 5: Padding and Alignment (Deep Practical View)</h2>
+      <p>
+        Alignment is an address law; padding is a layout consequence.
+        Ignore either one, and memory math eventually lies to you.
+      </p>
+      <p>
+        In the snippet below, type names are from <code>a::types.hpp</code>:
+        <code>a::u8</code> is <code>unsigned char</code>, and
+        <code>a::u32</code> is <code>unsigned int</code>.
+      </p>
+      <div class="code"><pre><code>struct packet_header {
+    a::u8  type;   // offset 0
+    a::u32 size;   // often offset 4, not 1
+};
+
+// Typical result on common ABIs:
+// alignof(packet_header) == 4
+// sizeof(packet_header)  == 8 (includes padding)</code></pre></div>
+      <p>
+        Why this matters in deterministic planners:
+      </p>
+      <ul>
+        <li>Field offsets are not "sum of previous field sizes".</li>
+        <li>Array stride is <code>sizeof(T)</code>, including tail padding.</li>
+        <li>Packed byte math without alignment rules eventually corrupts layout assumptions.</li>
+      </ul>
+      <div class="code"><pre><code>// Concept used by req_sum(a, b):
+start_b = align_up(a.bytes, b.align)
+result.bytes = start_b + b.bytes
+result.align = max(a.align, b.align)</code></pre></div>
+      <p class="code-note">
+        <strong>On fingers:</strong> if block A ends at 20 and block B needs alignment 16,
+        B starts at 32, not 21. The skipped bytes are intentional structure, not waste.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Iceberg Level 6: Memory Frame and Rewind</h2>
+      <p>
+        A memory frame is a scoped promise: "everything allocated after this mark is temporary".
+        Rewind enforces that promise in one operation.
+      </p>
+      <div class="code"><pre><code>a::u8 storage[64 * 1024]{};
+a::arena_view arena{storage, sizeof(storage)};
+
+{
+    a::scope frame(arena); // save mark
+    // alloc A, alloc B, alloc C
+} // rewind: A/B/C are collectively dropped</code></pre></div>
+      <p class="code-note">
+        <strong>Why it scales:</strong> no per-object free list, no hidden ownership graph.
+        One mark, one rewind, deterministic cost.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Iceberg Level 7: Contracts (<code>require</code>, <code>assume</code>, <code>assume_verified</code>)</h2>
+      <p>
+        Contracts are the language of truth in this framework.
+        They separate caller obligations, internal guarantees, and optimization-grade assumptions.
+      </p>
+      <table>
+        <thead><tr><th>Primitive</th><th>Use Exactly For</th><th>Avoid</th></tr></thead>
+        <tbody>
+          <tr><td><code>require(cond)</code></td><td>Public/API precondition</td><td>Optional hints or style checks</td></tr>
+          <tr><td><code>ensure(cond)</code></td><td>Postcondition after operation</td><td>Input validation at boundary</td></tr>
+          <tr><td><code>invariant(cond)</code></td><td>Object/module internal consistency</td><td>External user error handling</td></tr>
+          <tr><td><code>assume(cond)</code></td><td>Checked assumption with optional optimizer support</td><td>Replacing <code>require</code> semantics</td></tr>
+          <tr><td><code>assume_verified(cond)</code></td><td>Condition already proven and stable in the current path</td><td>Unproven or mutable condition</td></tr>
+        </tbody>
+      </table>
+      <p class="code-note">
+        <strong>Trusted path:</strong> a path where the condition is already established and cannot change before use.
+        Example: after <code>require(is_pow2(align))</code>, inside a tight branch that does not modify <code>align</code>, using <code>assume_verified(is_pow2(align))</code> is valid.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Iceberg Level 8: Freestanding vs Bare-Metal, and Why <code>a::</code> Does Not Allocate RAM</h2>
+      <p>
+        <strong>Freestanding</strong> means minimal language/runtime assumptions.
+        <strong>Bare-metal</strong> means operating close to hardware, often without full OS services.
+      </p>
+      <p>
+        Layer <code>a</code> is intentionally pure: it cannot assume OS allocators, virtual memory, filesystem, or scheduler-backed services.
+        Therefore, RAM acquisition is not <code>a</code>'s job.
+      </p>
+      <div class="infobox">
+        <strong>Layer contract:</strong>
+        <code>a</code> defines deterministic primitives and consumes caller-provided storage.
+        <code>b</code> may provide OS/platform memory sources.
+        <code>c</code> builds higher-level frameworks on top.
+      </div>
+      <p class="code-note">
+        <strong>On fingers:</strong> <code>a</code> is the engine geometry, not the gas station.
+      </p>
+    </section>
+
+    <footer class="foot">
+      Continue with <a href="memory-model.html">Memory Model</a>, then <a href="two-pass-guide.html">Two Pass</a>, then <a href="recipes.html">Recipes</a>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
+  select.value = currentProject;
+
+  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
+  if (!suffix) suffix = 'index.html';
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  function targetUrl(project, relativePath) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/' + relativePath + query + hash;
+  }
+
+  function fallbackUrl(project) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    return prefix + project + '/docs/index.html' + query + hash;
+  }
+
+  async function switchProject(project) {
+    var preferred = targetUrl(project, suffix);
+
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
+      window.location.href = preferred;
+      return;
+    }
+
+    try {
+      var res = await fetch(preferred, { method: 'HEAD' });
+      if (res && res.ok) {
+        window.location.href = preferred;
+        return;
+      }
+    } catch (e) {
+      // ignore and use fallback
+    }
+
+    window.location.href = fallbackUrl(project);
+  }
+
+  select.addEventListener('change', function (e) {
+    switchProject(e.target.value);
+  });
+})();
+</script>
+</body>
+</html>
