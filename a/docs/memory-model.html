@@ -71,14 +71,14 @@
           <div class="code"><pre><code>start_b = align_up(a.bytes, b.align)
 result.bytes = start_b + b.bytes
 result.align = max(a.align, b.align)</code></pre></div>
-      <p class='code-note'>This formula aligns the second component, appends its bytes, and keeps the strictest alignment in the resulting packed layout.<br><strong>Plain example:</strong> if block A ends at byte 20 and block B requires align 16, B starts at byte 32, not 21.</p>
+      <p class='code-note'><strong>Line-by-line:</strong><br>1) <code>start_b = align_up(a.bytes, b.align)</code> computes where <code>b</code> is allowed to start after <code>a</code> with proper alignment.<br>2) <code>result.bytes = start_b + b.bytes</code> gives total packed size after placing <code>b</code>.<br>3) <code>result.align = max(a.align, b.align)</code> keeps the strictest alignment required by the combined layout.<br><strong>Plain example:</strong> if block A ends at byte 20 and block B requires align 16, B starts at byte 32, not 21.</p>
         </article>
         <article class="card">
           <h3><code>req_max(a,b)</code></h3>
           <p class="muted">Use when phases are mutually exclusive and reuse one arena.</p>
           <div class="code"><pre><code>result.bytes = max(a.bytes, b.bytes)
 result.align = max(a.align, b.align)</code></pre></div>
-      <p class='code-note'>This formula does not pack components together; it computes the peak reusable region for mutually exclusive phases.<br><strong>Plain example:</strong> if boot needs 96 KB and runtime needs 40 KB, reserve 96 KB total.</p>
+      <p class='code-note'><strong>Line-by-line:</strong><br>1) <code>result.bytes = max(a.bytes, b.bytes)</code> picks only the larger byte requirement because phases do not coexist.<br>2) <code>result.align = max(a.align, b.align)</code> keeps alignment safe for either phase when reusing one arena.<br><strong>Plain example:</strong> if boot needs 96 KB and runtime needs 40 KB, reserve 96 KB total.</p>
         </article>
       </div>
       <p class="infobox"><strong>Rule:</strong> <code>sum</code> for coexistence, <code>max</code> for exclusive phases.</p>

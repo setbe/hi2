@@ -72,14 +72,14 @@
           <div class="code"><pre><code>start_b = align_up(a.bytes, b.align)
 result.bytes = start_b + b.bytes
 result.align = max(a.align, b.align)</code></pre></div>
-      <p class='code-note'>Ця формула вирівнює другий компонент, додає його байти та зберігає найсуворіше вирівнювання для всього packed layout.<br><strong>На пальцях:</strong> якщо перший блок закінчився на байті 20, а другому треба align 16, другий стартує з 32, а не з 21.</p>
+      <p class='code-note'><strong>Розбір по рядках:</strong><br>1) <code>start_b = align_up(a.bytes, b.align)</code> рахує коректний старт для <code>b</code> після <code>a</code> з урахуванням вирівнювання.<br>2) <code>result.bytes = start_b + b.bytes</code> дає повний packed-розмір після додавання <code>b</code>.<br>3) <code>result.align = max(a.align, b.align)</code> фіксує найсуворіше вирівнювання для всього спільного layout.<br><strong>На пальцях:</strong> якщо перший блок закінчився на байті 20, а другому треба align 16, другий стартує з 32, а не з 21.</p>
         </article>
         <article class="card">
           <h3><code>req_max(a,b)</code></h3>
           <p class="muted">Коли фази взаємовиключні й arena перевикористовується.</p>
           <div class="code"><pre><code>result.bytes = max(a.bytes, b.bytes)
 result.align = max(a.align, b.align)</code></pre></div>
-      <p class='code-note'>Ця формула не пакує компоненти разом; вона рахує піковий reusable region для взаємовиключних фаз.<br><strong>На пальцях:</strong> якщо boot просить 96 КБ, а runtime 40 КБ, загалом треба лише 96 КБ.</p>
+      <p class='code-note'><strong>Розбір по рядках:</strong><br>1) <code>result.bytes = max(a.bytes, b.bytes)</code> бере більший обсяг, бо фази не живуть одночасно.<br>2) <code>result.align = max(a.align, b.align)</code> зберігає безпечне вирівнювання для будь-якої з фаз у спільній arena.<br><strong>На пальцях:</strong> якщо boot просить 96 КБ, а runtime 40 КБ, загалом треба лише 96 КБ.</p>
         </article>
       </div>
       <p class="infobox"><strong>Правило:</strong> <code>sum</code> для співіснування, <code>max</code> для взаємовиключних фаз.</p>
