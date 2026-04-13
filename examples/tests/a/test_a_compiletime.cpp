@@ -78,15 +78,26 @@ static_assert(a::profile::preset<a::profile::level::audit>::value().check_requir
 static_assert(!a::profile::preset<a::profile::level::audit>::value().emit_assume_hint,
               "audit disables assume hints");
 
-using contract_fn = void (*)(bool) noexcept;
+using contract_fn = void (*)(bool);
 contract_fn require_strict = &a::contract::require_as<a::profile::level::strict>;
 contract_fn ensure_lean = &a::contract::ensure_as<a::profile::level::lean>;
-contract_fn assume_verified_audit = &a::contract::assume_verified_as<a::profile::level::audit>;
+
+struct alignment_is_pow2;
+using proof_t = a::contract::proven<alignment_is_pow2>;
+using proof_builder_fn = proof_t (*)(bool);
+proof_builder_fn require_that_audit =
+    &a::contract::require_that_as<alignment_is_pow2, a::profile::level::audit>;
+
+static_assert(a::is_same<decltype(a::contract::prove_static<alignment_is_pow2, true>()), proof_t>::value,
+              "prove_static returns proof token");
 
 int main() {
     (void)require_strict;
     (void)ensure_lean;
-    (void)assume_verified_audit;
+    (void)require_that_audit;
+
+    auto p = a::contract::require_that_as<alignment_is_pow2, a::profile::level::audit>(true);
+    a::contract::assume_verified_as<a::profile::level::audit, alignment_is_pow2>(a::move(p));
 
     const image_width width{512};
     const align_pow2 align{64};

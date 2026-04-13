@@ -5,11 +5,13 @@ Short reference for `a/` contract discipline.
 ## Core Rules
 
 - Use `a::contract::require(...)` for **API preconditions**.
+- Use `a::contract::require_that<Tag>(...)` when you need an explicit proof token for assume-paths.
 - Use `a::contract::ensure(...)` for **postconditions** that must hold after operation.
 - Use `a::contract::invariant(...)` for **internal state invariants**.
-- Use `a::contract::assume_verified(...)` only when condition is already proven by prior checks.
-- Use `a::contract::assume(...)` for checked assumption + optional optimizer hint.
+- Use `a::contract::assume_verified(proven<Tag>&&)` only with proof tokens from trusted paths.
 - Use `a::contract::unreachable()` for impossible control-flow paths.
+
+`assume(...)` and `assume(bool)` are intentionally deleted from the public API.
 
 All contract failures end in `panic()` (non-returning hard fail).
 
@@ -43,22 +45,26 @@ Examples:
 - `offset <= size`
 - layout component index uniqueness assumptions
 
-### `assume_verified(cond)`
+### `require_that<Tag>(cond) -> proven<Tag>`
 
-Use only after the condition is already validated by logic/contracts.
+Use when a runtime check should produce an explicit proof token for later assume paths.
 
 Examples:
 
-- after `require(is_pow2(align))`, internal fast-path may use `assume_verified(is_pow2(align))`
+- `auto p = require_that<alignment_is_pow2>(is_pow2(align));`
+- `auto p = require_that<idx_in_range>(idx < count);`
 
-### `assume(cond)`
+### `assume_verified(proven<Tag>&&)`
 
-Checked assumption path:
+Use only with proof tokens.
+Tokens are move-only and consumed on first use.
+`assume_verified` is a proof-consumption marker, not an expression prover.
 
-- if `cond` is false: panic (no silent pass)
-- if `cond` is true: may emit optimizer hint depending on `a::profile`
+### `prove_static<Tag, Cond>()`
 
-Use for hot internal paths where constraint is expected and failing it is a contract violation.
+Compile-time proof source:
+
+- `prove_static<Tag, true>()` requires `Cond == true`
 
 ### `unreachable()`
 
@@ -83,8 +89,8 @@ It is modeled as hard-fail contract, not as recovery path.
 ## Practical Checklist
 
 - API boundary check: `require`
+- API boundary check with reusable proof: `require_that<Tag>`
 - Internal consistency: `invariant`
 - Final state check: `ensure`
-- Proven hot-path hint: `assume_verified`
-- Checked hint with same failure semantics: `assume`
+- Consume previously proven token: `assume_verified(proven<Tag>&&)`
 - Impossible switch/default: `unreachable`

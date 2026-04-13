@@ -42,17 +42,35 @@
   <main class="wrap">
     <section class="hero">
       <h1>Module Map</h1>
-      <p>A quick architectural map of <code>a/</code>: what each header owns and why it exists.</p>
+      <p>
+        This chapter explains the role of every public header in <code>a/</code>, the intended dependency direction,
+        and the mental model you should keep while extending the codebase.
+      </p>
     </section>
 
     <section class="section">
-      <h2>Core Headers</h2>
+      <h2>How to Read This Map</h2>
+      <p>
+        Think in two axes:
+      </p>
+      <ul>
+        <li><strong>Layer axis:</strong> what must stay pure (<code>a</code>) vs what can depend on environment.</li>
+        <li><strong>Domain axis:</strong> memory, contracts, views, math, crypto, and composition.</li>
+      </ul>
+      <p class="infobox">
+        <strong>Rule of thumb:</strong> if a header requires OS types or hidden allocation, it does not belong in
+        <code>a</code>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Core Headers (Public Surface)</h2>
       <table>
         <thead><tr><th>Header</th><th>Role</th><th>Main Surface</th></tr></thead>
         <tbody>
           <tr><td><code>a/config.hpp</code></td><td>Compiler/arch/language feature detection</td><td>Macros: <code>A_COMPILER_*</code>, <code>A_ARCH_*</code>, <code>A_ENDIAN_*</code>, attributes/branch hints</td></tr>
           <tr><td><code>a/profile.hpp</code></td><td>Contract profile policy</td><td><code>profile::level</code>, <code>profile::preset</code>, global <code>current_level</code></td></tr>
-          <tr><td><code>a/contract.hpp</code></td><td>Unified contract mechanism</td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>assume</code>, <code>assume_verified</code>, <code>unreachable</code></td></tr>
+          <tr><td><code>a/contract.hpp</code></td><td>Unified contract mechanism</td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>require_that</code>, <code>assume_verified</code>, <code>unreachable</code></td></tr>
           <tr><td><code>a/bounded.hpp</code></td><td>Constrained scalar value types</td><td><code>bounded&lt;T,Min,Max&gt;</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td></tr>
           <tr><td><code>a/types.hpp</code></td><td>Fixed-width primitives</td><td><code>u8..u64</code>, <code>i8..i64</code>, <code>usize/isize</code>, <code>u128</code>, <code>npos</code></td></tr>
           <tr><td><code>a/status.hpp</code></td><td>Status channel</td><td><code>enum class status</code>, <code>is_ok()</code></td></tr>
@@ -69,7 +87,27 @@
           <tr><td><code>a/a.hpp</code></td><td>Umbrella include</td><td>Stable include order for all core headers</td></tr>
         </tbody>
       </table>
-      <p class="infobox"><strong>Contract rules:</strong> API boundaries use <code>require</code>; impossible paths use <code>unreachable</code>; optimizer hints belong to <code>assume_verified</code> after proof. See <code>a/CONTRACTS.md</code>.</p>
+      <p class="infobox">
+        <strong>Contract rule:</strong> API boundaries use <code>require</code>, proof-producing checks use
+        <code>require_that&lt;Tag&gt;</code>, and proof consumption uses <code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code>.
+        See <code>a/CONTRACTS.md</code>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Dependency Order Inside <code>a/</code></h2>
+      <div class="code"><pre><code>config
+  -> types
+  -> meta / utility
+  -> view / utf8 / bit / math / charconv_base
+  -> memory_requirements / arena
+  -> two_pass
+  -> crypto</code></pre></div>
+      <p class="code-note">
+        This order keeps low-level primitives independent and reusable.
+        <br><strong>Plain example:</strong> <code>crypto/detail/load_store.hpp</code> depends on <code>a::bit</code>
+        so byte-order logic is implemented once.
+      </p>
     </section>
 
     <section class="section">
@@ -88,25 +126,47 @@
     </section>
 
     <section class="section">
-      <h2>Internal Headers</h2>
+      <h2>Internal Headers (<code>detail/</code> Surface)</h2>
       <div class="grid">
         <article class="card">
           <h3><code>a/detail/arch.hpp</code></h3>
-          <p class="muted">Arch tags and <code>arch_default</code> selection for internal fast-path policy.</p>
+          <p class="muted">
+            Arch tags and <code>arch_default</code> selection for internal fast-path policy. This is where
+            architecture-specific specialization belongs, not in public names.
+          </p>
         </article>
         <article class="card">
           <h3><code>a/crypto/detail/load_store.hpp</code></h3>
-          <p class="muted">LE/BE load-store helpers for crypto modules, built on <code>a::bit</code>.</p>
+          <p class="muted">
+            Canonical LE/BE load-store helpers for crypto modules, built on <code>a::bit</code>. This avoids drift in
+            byte-order behavior across algorithms.
+          </p>
         </article>
         <article class="card">
           <h3><code>a/crypto/detail/ct.hpp</code></h3>
-          <p class="muted">Constant-time compare helpers: <code>ct_equal_n</code> and <code>ct_equal</code>.</p>
+          <p class="muted">
+            Constant-time compare helpers: <code>ct_equal_n</code> and <code>ct_equal</code>. These exist to prevent
+            accidental timing leaks from regular early-exit comparisons.
+          </p>
         </article>
         <article class="card">
           <h3><code>a/crypto/detail/wipe.hpp</code></h3>
-          <p class="muted">Best-effort secret wipe via volatile byte loop.</p>
+          <p class="muted">
+            Best-effort secret wipe via volatile byte loop. Use this for keys and intermediate secrets that should not
+            persist after phase completion.
+          </p>
         </article>
       </div>
+    </section>
+
+    <section class="section">
+      <h2>Common Placement Mistakes</h2>
+      <ul>
+        <li>Putting thread/scheduler behavior in <code>a</code> instead of <code>b</code>.</li>
+        <li>Adding APIs that silently allocate memory behind callers.</li>
+        <li>Mixing protocol logic and OS wrapper logic in one header.</li>
+        <li>Leaking platform-native handles into portable public interfaces.</li>
+      </ul>
     </section>
 
     <footer class="foot">

@@ -42,7 +42,10 @@
   <main class="wrap">
     <section class="hero">
       <h1>API Atlas</h1>
-      <p>A compact reference for the most important public contracts in <code>a::</code>.</p>
+      <p>
+        This atlas is the “contract map” of <code>a::</code>: what each public type promises, which invariant matters,
+        and how pieces fit together in real usage.
+      </p>
     </section>
 
     <section class="section">
@@ -62,6 +65,12 @@
           <tr><td><code>a::two_pass::scope&lt;Ts...&gt;</code></td><td>runtime object</td><td>Convenience wrapper over <code>a::typed_scope&lt;a::layout&lt;Ts...&gt;&gt;</code></td></tr>
         </tbody>
       </table>
+      <p class="code-note">
+        <strong>Mental model:</strong> <code>memory_req</code> describes, <code>layout</code> composes,
+        <code>typed_scope</code> executes.
+        <br><strong>Plain example:</strong> “I need 3 typed components” -> calculate bytes/alignment at compile-time ->
+        bind those slots to one runtime arena frame.
+      </p>
     </section>
 
     <section class="section">
@@ -84,6 +93,10 @@
           <p class="muted">For typed construction, components must be nothrow-constructible and nothrow-destructible.</p>
         </article>
       </div>
+      <p class="infobox">
+        <strong>Core invariant:</strong> if <code>active()==false</code>, the scope is not usable; if scope is inert,
+        constructed-state must be empty.
+      </p>
     </section>
 
     <section class="section">
@@ -92,17 +105,31 @@
         <thead><tr><th>File</th><th>Main Surface</th><th>When to Use</th></tr></thead>
         <tbody>
           <tr><td><code>a/profile.hpp</code></td><td><code>profile::level</code>, <code>preset</code>, <code>current_level</code></td><td>Select build-wide contract mode (<code>strict</code>/<code>audit</code>/<code>lean</code>)</td></tr>
-          <tr><td><code>a/contract.hpp</code></td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>assume</code>, <code>assume_verified</code>, <code>unreachable</code></td><td>Enforce correctness as hard-fail contracts</td></tr>
+          <tr><td><code>a/contract.hpp</code></td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>require_that</code>, <code>assume_verified</code>, <code>unreachable</code></td><td>Enforce correctness as hard-fail contracts</td></tr>
           <tr><td><code>a/bounded.hpp</code></td><td><code>bounded</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td><td>Represent dimensions/counts/alignment as validated types</td></tr>
         </tbody>
       </table>
       <ul>
         <li><code>require</code>: caller/API preconditions.</li>
-        <li><code>assume</code>: checked assumption (panic on false, optional optimizer hint on true).</li>
-        <li><code>assume_verified</code>: use after prior proof/check; same failure semantics as <code>assume</code>.</li>
+        <li><code>require_that&lt;Tag&gt;</code>: runtime check that mints a proof token.</li>
+        <li><code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code>: consume one live proof token on trusted path.</li>
         <li>Trusted path in bounded types is internal-only construction, not a user-input bypass.</li>
       </ul>
       <p class="infobox"><strong>See:</strong> <code>a/CONTRACTS.md</code> for compact decision rules.</p>
+    </section>
+
+    <section class="section">
+      <h2>Lifecycle API by Intent</h2>
+      <table>
+        <thead><tr><th>Intent</th><th>API</th><th>What it does not do</th></tr></thead>
+        <tbody>
+          <tr><td>Request raw storage for a component</td><td><code>slot&lt;T&gt;()</code></td><td>Does not start object lifetime</td></tr>
+          <tr><td>Start typed lifetime</td><td><code>construct&lt;T&gt;(...)</code></td><td>Does not close scope automatically</td></tr>
+          <tr><td>Stop one object lifetime</td><td><code>destroy&lt;T&gt;()</code></td><td>Does not close frame</td></tr>
+          <tr><td>Stop all constructed lifetimes</td><td><code>destroy_all()</code></td><td>Does not make scope inert</td></tr>
+          <tr><td>Close frame and invalidate scope</td><td><code>release()</code></td><td>Does not preserve usability</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <section class="section">
@@ -135,7 +162,12 @@
     </section>
 
     <section class="section">
-      <h2>Detailed Source</h2>
+      <h2>How to Use This Atlas in Practice</h2>
+      <ul>
+        <li>When implementing a module: start from the tables above, then lock contracts in code.</li>
+        <li>When reviewing a PR: validate that every new API matches an intent from this atlas.</li>
+        <li>When debugging: map failing behavior to violated contract category first (precondition, invariant, lifetime).</li>
+      </ul>
       <p>For exact line-by-line definitions, open <a href="source/index.html">Source Reference</a>.</p>
     </section>
 

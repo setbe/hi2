@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="uk">
 <head>
   <meta charset="utf-8">
@@ -43,227 +43,181 @@
     <section class="hero">
       <h1>Required C++ Knowledge for Starting with Bare-Metal</h1>
       <p>
-        Цей розділ написаний як технічний вступ-підручник, а не як сухий список.
-        Ми починаємо з відомих C++ понять і поступово занурюємось у глибину, на якій працює <code>a::</code>.
+        Цей розділ написаний як технічний вступ-підручник, а не як короткий конспект.
+        Ми рухаємось від знайомих C++ понять до глибших принципів, на яких тримається <code>a::</code>.
+      </p>
+      <p>
+        Якщо термінів багато, читай по одному “iceberg-рівню” за сесію і проганяй приклади вручну.
+        Мета — побудувати інтуїцію, а потім формальну дисципліну.
       </p>
     </section>
 
     <section class="section">
-      <h2>Словник Перед Стартом (Прочитай Першим)</h2>
-      <p>
-        Ці терміни зустрічаються у всьому <code>a/</code>. Якщо зафіксувати їх зараз,
-        далі матеріал читається значно легше.
-      </p>
+      <h2>Як Працювати З Цим Розділом</h2>
+      <table>
+        <thead><tr><th>Етап</th><th>Що Читати</th><th>Що Практикувати</th></tr></thead>
+        <tbody>
+          <tr><td>База</td><td>Словник + Рівні 1-3</td><td>Поясни compile/link/runtime і ownership своїми словами</td></tr>
+          <tr><td>Memory-грамотність</td><td>Рівні 4-6</td><td>Порахуй один aligned-layout вручну</td></tr>
+          <tr><td>Contract-грамотність</td><td>Рівень 7</td><td>Розклади перевірки на require/ensure/invariant</td></tr>
+          <tr><td>Архітектурна грамотність</td><td>Рівень 8</td><td>Класифікуй приклади по шарах a/b/c/d</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Словник Перед Стартом</h2>
       <table>
         <thead><tr><th>Термін</th><th>Точне Значення</th><th>На Пальцях</th></tr></thead>
         <tbody>
           <tr><td><code>Компіляція</code></td><td>Перетворення C++ коду на object code.</td><td>Компілятор готує машинні частини з тексту програми.</td></tr>
-          <tr><td><code>Лінкування</code></td><td>Об'єднання object-файлів у фінальний бінарник.</td><td>Лінкер склеює шматки програми в один виконуваний образ.</td></tr>
-          <tr><td><code>Виконання</code></td><td>Робота CPU над фінальним машинним кодом.</td><td>Момент, коли програма реально "оживає".</td></tr>
+          <tr><td><code>Лінкування</code></td><td>Об'єднання object-файлів у фінальний бінарник.</td><td>Лінкер склеює шматки програми в один образ.</td></tr>
+          <tr><td><code>Виконання</code></td><td>Робота CPU над фінальним машинним кодом.</td><td>Момент, коли програма реально “живе”.</td></tr>
           <tr><td><code>Lifetime</code></td><td>Проміжок, у якому об'єкт легально існує.</td><td>Від конструктора до деструктора.</td></tr>
-          <tr><td><code>Ownership</code></td><td>Відповідальність за cleanup/звільнення ресурсу.</td><td>Хто зобов'язаний закрити, звільнити або відкотити.</td></tr>
-          <tr><td><code>Alignment</code></td><td>Вимога до адреси об'єкта (кратність 2/4/8/16 тощо).</td><td>Деякі типи мають стартувати лише з "правильних" адрес.</td></tr>
-          <tr><td><code>Padding</code></td><td>Приховані байти, які додає компілятор через alignment.</td><td>Невидимі "прокладки" всередині структури.</td></tr>
-          <tr><td><code>Memory-frame</code></td><td>Межа тимчасового lifetime всередині арени.</td><td>Чекпоінт у потоці алокацій.</td></tr>
-          <tr><td><code>Rewind</code></td><td>Повернення cursor арени до збереженої позначки.</td><td>Миттєве видалення всіх тимчасових алокацій після mark.</td></tr>
+          <tr><td><code>Ownership</code></td><td>Відповідальність за cleanup/звільнення ресурсу.</td><td>Хто повинен закрити, звільнити або відкотити.</td></tr>
+          <tr><td><code>Alignment</code></td><td>Вимога до адреси об'єкта (кратність 2/4/8/16...).</td><td>Деякі типи можуть стартувати лише з “правильних” адрес.</td></tr>
+          <tr><td><code>Padding</code></td><td>Приховані байти через alignment у layout.</td><td>Невидимі “прокладки” всередині структур.</td></tr>
+          <tr><td><code>Memory-frame</code></td><td>Межа тимчасового lifetime усередині арени.</td><td>Чекпойнт у потоці алокацій.</td></tr>
+          <tr><td><code>Rewind</code></td><td>Повернення arena cursor до збереженої позначки.</td><td>Миттєво прибрати всі тимчасові алокації після mark.</td></tr>
         </tbody>
       </table>
-      <p class="infobox"><strong>Правило читання:</strong> нижчі рівні айсберга побудовані саме з цих понять.</p>
+      <p class="infobox"><strong>Правило:</strong> усі глибші розділи нижче побудовані саме на цих термінах.</p>
     </section>
 
     <section class="section">
-      <h2>Айсберг Рівень 1: Компіляція, Лінкування, Виконання</h2>
+      <h2>Iceberg Рівень 1: Компіляція, Лінкування, Виконання</h2>
       <p>
-        У цій архітектурі compile-time - це частина коректності, а не просто оптимізація.
-        Ми свідомо переносимо багато рішень у compile-time, щоб поведінка була передбачуваною.
+        Для цієї архітектури compile-time — частина коректності, а не декоративна оптимізація.
+        Багато рішень свідомо переноситься в compile-time, щоб runtime-поведінка була передбачуваною.
       </p>
       <div class="code"><pre><code>constexpr a::u32 kib(a::u32 n) noexcept { return n * 1024u; }
 
-constexpr a::u32 boot_pool = kib(64); // compile-time обчислення
+constexpr a::u32 boot_pool = kib(64); // compile-time
 
-a::u32 user_pages = 3;
-a::u32 runtime_pool = kib(user_pages); // runtime обчислення</code></pre></div>
-      <p class="code-note">
-        <strong>Ключ:</strong> <code>constexpr</code> означає "може бути compile-time", а не "завжди compile-time".
-        Та сама функція може виконатись і на етапі компіляції, і під час виконання.
-        <br><strong>На пальцях:</strong> відомо зараз -> рахує компілятор, стане відомо потім -> рахує CPU.
-      </p>
+a::u32 pages = 3;
+a::u32 runtime_pool = kib(pages); // runtime</code></pre></div>
+      <p class="code-note"><strong>Ключ:</strong> <code>constexpr</code> означає “може бути compile-time”, а не “завжди compile-time”.</p>
     </section>
 
     <section class="section">
-      <h2>Айсберг Рівень 2: Lifetime та Ownership (Чому RAII - Фундамент)</h2>
+      <h2>Iceberg Рівень 2: Lifetime та Ownership</h2>
       <p>
-        <code>a::</code> тримається на явних memory-контрактах і детермінованому cleanup.
-        RAII робить це стабільним навіть при ранніх return і складних гілках.
+        У <code>a::</code> пам'ять і ресурси мають явний життєвий цикл. RAII тут не “стиль”, а механізм стабільності.
       </p>
-      <div class="code"><pre><code>void parse_phase(a::arena_view&amp; arena) {
-    a::scope frame(arena); // отримали mark memory-frame
-    // тимчасові алокації і тимчасові об'єкти
-} // деструктор робить rewind, ownership фази завершується</code></pre></div>
-      <p class="code-note">
-        <strong>Технічно:</strong> lifetime і ownership зв'язані: власник frame відповідає за його завершення.
-        <br><strong>На пальцях:</strong> відкрив робочий стіл, зробив тимчасову роботу, закрив стіл, прибрав усе разом.
-      </p>
+      <div class="code"><pre><code>void phase(a::arena_view&amp; arena) {
+    a::scope frame(arena); // mark
+    // temporary work
+} // rewind на деструкторі</code></pre></div>
     </section>
 
     <section class="section">
-      <h2>Айсберг Рівень 3: Вказівники, Runtime-Розмір і Compile-Time-Розмір</h2>
+      <h2>Iceberg Рівень 3: Вказівники і Розмір</h2>
       <p>
-        Вказівник дає гнучкість, але сам по собі не несе достатньо контракту:
-        він містить адресу, але не довжину і не семантику буфера.
+        Вказівник дає адресу, але не гарантує довжину і семантику буфера. Саме тому потрібні явні view-контракти.
       </p>
       <div class="code"><pre><code>a::u8 raw[256]{};
 a::usize n = 128;
-a::view&lt;a::u8&gt; dyn{raw, n}; // view з runtime-розміром</code></pre></div>
-      <p>
-        Саме тому "просто використати <code>std::vector</code>" не вирішує детерміновані протокольні вимоги:
-        розмір vector - це runtime-стан, а багато крипто/бінарних контрактів мають фіксовані розміри зі специфікації.
-      </p>
+a::view&lt;a::u8&gt; dyn{raw, n};</code></pre></div>
     </section>
 
     <section class="section">
-      <h2>Айсберг Рівень 4: Що Таке View Насправді (<code>view&lt;T&gt;</code> проти <code>view_n&lt;T,N&gt;</code>)</h2>
+      <h2>Iceberg Рівень 4: <code>view&lt;T&gt;</code> проти <code>view_n&lt;T,N&gt;</code></h2>
       <p>
-        View - це не-owning вікно у вже існуючу пам'ять.
-        У <code>a/</code> це ключове розділення:
-        dynamic view для runtime-даних і fixed view для compile-time контрактів.
+        <code>view&lt;T&gt;</code> — runtime-розмір, <code>view_n&lt;T,N&gt;</code> — compile-time-розмір.
+        Для криптографії fixed-size view часто кращий, бо розмір є частиною контракту.
       </p>
       <div class="code"><pre><code>a::u8 key[32]{};
 a::u8 nonce[12]{};
-a::u8 tag[16]{};
 
 a::byte_view_n&lt;32&gt; key_v = a::as_view(key);
-a::byte_view_n&lt;12&gt; nonce_v = a::as_view(nonce);
-a::byte_view_mut_n&lt;16&gt; tag_v = a::as_view_mut(tag);</code></pre></div>
-      <p class="code-note">
-        <strong>Чому це size-safe:</strong> розмір зашитий у тип.
-        Неправильний буфер не "майже підійде", а буде відсічений на межі типу.
-        <br><strong>Реальний приклад:</strong> <code>a::crypto::x25519</code> і <code>a::crypto::aead_chacha20_poly1305</code> використовують fixed-size view для ключів/nonce/tag.
-      </p>
+a::byte_view_n&lt;12&gt; nonce_v = a::as_view(nonce);</code></pre></div>
     </section>
 
     <section class="section">
-      <h2>База Типів Перед Layout-Математикою: Типи C++ і Типи <code>a::</code></h2>
-      <p>
-        Перед padding/alignment треба зафіксувати мову типів.
-        У цьому проєкті імена <code>a::</code> є явними alias поверх базових інтегральних типів C++.
-      </p>
+      <h2>Типи C++ та Типи <code>a::</code></h2>
       <table>
-        <thead><tr><th>Тип <code>a::</code></th><th>Базовий Тип C++</th><th>Типова Роль у a::</th></tr></thead>
+        <thead><tr><th>Тип <code>a::</code></th><th>Підлеглий Тип C++</th><th>Типова Роль</th></tr></thead>
         <tbody>
-          <tr><td><code>a::u8</code></td><td><code>unsigned char</code></td><td>Сирі байти, binary-буфери, crypto-блоки.</td></tr>
-          <tr><td><code>a::u16</code></td><td><code>unsigned short</code></td><td>Компактні лічильники/поля.</td></tr>
+          <tr><td><code>a::u8</code></td><td><code>unsigned char</code></td><td>Байти і binary-буфери.</td></tr>
+          <tr><td><code>a::u16</code></td><td><code>unsigned short</code></td><td>Компактні поля/лічильники.</td></tr>
           <tr><td><code>a::u32</code></td><td><code>unsigned int</code></td><td>Розміри, лічильники, протокольні слова.</td></tr>
-          <tr><td><code>a::u64</code></td><td><code>unsigned long long</code></td><td>Великі лічильники і wide-арифметика.</td></tr>
-          <tr><td><code>a::usize</code></td><td><code>decltype(sizeof(0))</code></td><td>Розміри об'єктів і кількість байтів у memory API.</td></tr>
-          <tr><td><code>a::isize</code></td><td><code>ptrdiff-like signed size</code></td><td>Різниця вказівників і signed-offset значення.</td></tr>
+          <tr><td><code>a::u64</code></td><td><code>unsigned long long</code></td><td>Широка арифметика і великі лічильники.</td></tr>
+          <tr><td><code>a::usize</code></td><td><code>decltype(sizeof(0))</code></td><td>Розміри об'єктів у memory API.</td></tr>
         </tbody>
       </table>
-      <p class="code-note">
-        <strong>Навіщо alias-и:</strong> вони роблять контракти API читабельними.
-        <br><strong>На пальцях:</strong> <code>a::u8</code> одразу каже "байтова семантика", а не "просто якесь число".
-      </p>
     </section>
 
     <section class="section">
-      <h2>Айсберг Рівень 5: Padding та Alignment (Практично і Глибоко)</h2>
+      <h2>Iceberg Рівень 5: Padding і Alignment</h2>
       <p>
-        Alignment - це закон адресації, padding - наслідок цього закону в layout.
-        Якщо ігнорувати хоч одне з двох, memory-математика рано чи пізно стає хибною.
-      </p>
-      <p>
-        У фрагменті нижче імена беруться з <code>a/types.hpp</code>:
-        <code>a::u8</code> це <code>unsigned char</code>, а
-        <code>a::u32</code> це <code>unsigned int</code>.
+        Alignment — закон адреси, padding — наслідок цього закону у layout. Ігнорування будь-якого пункту ламає memory-математику.
       </p>
       <div class="code"><pre><code>struct packet_header {
-    a::u8  type;   // offset 0
-    a::u32 size;   // часто offset 4, а не 1
+    a::u8  type;
+    a::u32 size;
 };
 
-// Типово на поширених ABI:
+// типово:
 // alignof(packet_header) == 4
-// sizeof(packet_header)  == 8 (через padding)</code></pre></div>
-      <p>Що важливо запам'ятати:</p>
-      <ul>
-        <li>Offset поля не дорівнює "просто сума попередніх полів".</li>
-        <li>Stride масиву структур = <code>sizeof(T)</code>, включно з tail padding.</li>
-        <li>Ручний packed-рахунок без alignment правил ламає контракт layout.</li>
-      </ul>
-      <div class="code"><pre><code>// Логіка, яку використовує req_sum(a, b):
-start_b = align_up(a.bytes, b.align)
+// sizeof(packet_header)  == 8</code></pre></div>
+      <div class="code"><pre><code>start_b = align_up(a.bytes, b.align)
 result.bytes = start_b + b.bytes
 result.align = max(a.align, b.align)</code></pre></div>
-      <p class="code-note">
-        <strong>На пальцях:</strong> якщо A закінчився на байті 20, а B вимагає align 16,
-        B стартує з 32, не з 21. Пропущені байти - це структурна вимога, а не випадковий "мусор".
-      </p>
     </section>
 
     <section class="section">
-      <h2>Айсберг Рівень 6: Memory-Frame та Rewind</h2>
-      <p>
-        Memory-frame - це scoped-обіцянка: "все після цієї позначки тимчасове".
-        Rewind виконує цю обіцянку однією операцією.
-      </p>
+      <h2>Iceberg Рівень 6: Memory-frame і Rewind</h2>
       <div class="code"><pre><code>a::u8 storage[64 * 1024]{};
 a::arena_view arena{storage, sizeof(storage)};
 
 {
-    a::scope frame(arena); // зберегли mark
-    // alloc A, alloc B, alloc C
-} // rewind: A/B/C прибираються разом</code></pre></div>
-      <p class="code-note">
-        <strong>Чому це масштабується:</strong> без списків free, без прихованих графів ownership.
-        Один mark, один rewind, детермінована вартість.
-      </p>
+    a::scope frame(arena);
+    // alloc A/B/C
+} // rewind</code></pre></div>
+      <p class="code-note">Один mark + один rewind дають детермінований cleanup тимчасової фази.</p>
     </section>
 
     <section class="section">
-      <h2>Айсберг Рівень 7: Контракти (<code>require</code>, <code>assume</code>, <code>assume_verified</code>)</h2>
-      <p>
-        Контракти - це мова істини в цьому фреймворку.
-        Вони розділяють обов'язок caller-а, гарантії модуля і припущення для оптимізатора.
-      </p>
+      <h2>Iceberg Рівень 7: Контракти</h2>
       <table>
-        <thead><tr><th>Примітив</th><th>Використовувати Саме Для</th><th>Не Використовувати Для</th></tr></thead>
+        <thead><tr><th>Примітив</th><th>Призначення</th><th>Не Використовувати Для</th></tr></thead>
         <tbody>
-          <tr><td><code>require(cond)</code></td><td>Передумова на межі API</td><td>Стилістичні або опційні підказки</td></tr>
-          <tr><td><code>ensure(cond)</code></td><td>Постумова після операції</td><td>Перевірка користувацького вводу на вході</td></tr>
-          <tr><td><code>invariant(cond)</code></td><td>Внутрішня консистентність об'єкта/модуля</td><td>Обробка зовнішньої помилки користувача</td></tr>
-          <tr><td><code>assume(cond)</code></td><td>Перевірене припущення з optional optimizer-support</td><td>Заміна семантики <code>require</code></td></tr>
-          <tr><td><code>assume_verified(cond)</code></td><td>Умова вже доведена і стабільна в цьому шляху</td><td>Недоведена або змінна умова</td></tr>
+          <tr><td><code>require(cond)</code></td><td>Передумова на межі API</td><td>Опційні стилістичні перевірки</td></tr>
+          <tr><td><code>ensure(cond)</code></td><td>Постумова після операції</td><td>Перевірка user-input на вході</td></tr>
+          <tr><td><code>invariant(cond)</code></td><td>Внутрішня консистентність</td><td>Обробка зовнішніх помилок</td></tr>
+          <tr><td><code>require_that&lt;Tag&gt;(cond)</code></td><td>Перевірка + випуск proof-token</td><td>Сирий bool як доказ</td></tr>
+          <tr><td><code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code></td><td>Одноразово спожити proof-token</td><td>Повторне використання moved-token</td></tr>
         </tbody>
       </table>
-      <p class="code-note">
-        <strong>Trusted path:</strong> шлях, у якому умова вже встановлена і не може змінитися до місця використання.
-        Приклад: після <code>require(is_pow2(align))</code>, у гілці без зміни <code>align</code>, коректно давати <code>assume_verified(is_pow2(align))</code>.
-      </p>
     </section>
 
     <section class="section">
-      <h2>Айсберг Рівень 8: Freestanding vs Bare-Metal, і Чому <code>a::</code> Не Алокує RAM</h2>
+      <h2>Iceberg Рівень 8: Freestanding vs Bare-Metal</h2>
       <p>
-        <strong>Freestanding</strong> означає мінімальні припущення про runtime/бібліотеку.
+        <strong>Freestanding</strong> означає мінімальні припущення про runtime/стандартну бібліотеку.
         <strong>Bare-metal</strong> означає роботу близько до апаратного середовища, часто без повної ОС.
       </p>
       <p>
-        Рівень <code>a</code> принципово чистий: він не може припускати OS allocator, virtual memory, filesystem, thread scheduler.
-        Тому отримання RAM із середовища - не його задача.
+        Тому <code>a::</code> не займається отриманням RAM від ОС. Це відповідальність вищого шару (<code>b</code>) або користувача.
       </p>
       <div class="infobox">
-        <strong>Контракт шарів:</strong>
-        <code>a</code> задає детерміновані примітиви й працює з caller-provided пам'яттю.
-        <code>b</code> може дати OS/platform джерела пам'яті.
-        <code>c</code> будує high-level фреймворки зверху.
+        <strong>Контракт шарів:</strong> <code>a</code> визначає детерміновані примітиви; <code>b</code> дає environment capabilities;
+        <code>c</code>/<code>d</code> будують вищі моделі зверху.
       </div>
-      <p class="code-note">
-        <strong>На пальцях:</strong> <code>a</code> - це геометрія двигуна, а не заправка пальним.
-      </p>
+    </section>
+
+    <section class="section">
+      <h2>Міні-Вправи Для Самоперевірки</h2>
+      <ol>
+        <li>Порахуй <code>req_sum</code> вручну для трьох компонентів із різним align.</li>
+        <li>Наведи один коректний і один некоректний сценарій для <code>req_max</code>.</li>
+        <li>Для parser API розділи перевірки на <code>require</code> і <code>invariant</code>.</li>
+        <li>Поясни, чому hidden allocation ламає гарантії шару <code>a</code>.</li>
+      </ol>
     </section>
 
     <footer class="foot">
-      Далі переходь у <a href="memory-model.html">Модель Пам'яті</a>, потім у <a href="two-pass-guide.html">Two Pass</a>, потім у <a href="recipes.html">Рецепти</a>.
+      Далі: <a href="memory-model.html">Модель Пам'яті</a> -> <a href="two-pass-guide.html">Two Pass</a> -> <a href="recipes.html">Рецепти</a>.
     </footer>
   </main>
 <script id="project-switch-script">

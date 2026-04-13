@@ -4,6 +4,7 @@
 #include "a/arena.hpp"
 #include "a/bit.hpp"
 #include "a/bounded.hpp"
+#include "a/contract.hpp"
 #include "a/memory_requirements.hpp"
 #include "a/two_pass.hpp"
 
@@ -175,4 +176,20 @@ TEST_CASE("a::bitset tracks constructed flags", "[a][bitset]") {
     flags.clear();
     REQUIRE_FALSE(flags.any());
     REQUIRE(flags.count() == 0);
+}
+
+namespace {
+struct alignment_is_pow2_tag {};
+} // namespace
+
+TEST_CASE("a::contract proof tokens drive assume paths", "[a][contract]") {
+    auto proof_verified = a::contract::require_that<alignment_is_pow2_tag>(true);
+    a::contract::assume_verified(a::move(proof_verified));
+
+    auto static_proof = a::contract::prove_static<alignment_is_pow2_tag, true>();
+    a::contract::assume_verified(a::move(static_proof));
+
+    auto audit_proof =
+        a::contract::require_that_as<alignment_is_pow2_tag, a::profile::level::audit>(true);
+    a::contract::assume_verified_as<a::profile::level::audit>(a::move(audit_proof));
 }

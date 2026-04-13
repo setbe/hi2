@@ -47,6 +47,10 @@
         далі даємо реальний буфер і працюємо строго в його межах.
         Такий підхід робить поведінку передбачуваною навіть у найжорсткіших bare-metal сценаріях.
       </p>
+      <p>
+        Цей розділ іде в тому ж порядку, що й робочий процес у коді: формули вимог -> compile-time композиція ->
+        runtime frame/lifetime -> правила контрактів.
+      </p>
     </section>
 
     <section class="section">
@@ -88,6 +92,23 @@ result.align = max(a.align, b.align)</code></pre></div>
     </section>
 
     <section class="section">
+      <h2>Числовий Приклад (Покроково)</h2>
+      <div class="code"><pre><code>// A = { bytes: 20, align: 4  }
+// B = { bytes: 48, align: 16 }
+// C = { bytes: 12, align: 8  }
+
+ab_start = align_up(20, 16) = 32
+ab      = { bytes: 32 + 48 = 80, align: max(4,16) = 16 }
+
+abc_start = align_up(80, 8) = 80
+abc       = { bytes: 80 + 12 = 92, align: max(16,8) = 16 }</code></pre></div>
+      <p class="code-note">
+        <strong>Ідея:</strong> для одночасно живих A+B+C отримуємо packed-розмір 92 байти.
+        Для взаємовиключних фаз замість цього працює <code>req_max</code>.
+      </p>
+    </section>
+
+    <section class="section">
       <h2>Compile-Time Composition by Types</h2>
       <div class="code"><pre><code>struct font_phase {
     static constexpr a::memory_req requirement() noexcept { return {32 * 1024, 16}; }
@@ -103,6 +124,24 @@ constexpr a::memory_req load_req = load_layout::requirement();
 using boot_req = a::sum_req&lt;font_phase, image_phase&gt;;
 using runtime_req = a::max_req&lt;font_phase, image_phase&gt;;</code></pre></div>
       <p class='code-note'>У прикладі контракти пам'яті задаються на рівні типів: кожен тип має <code>requirement()</code>, а композиція виконується на compile-time.<br><strong>На пальцях:</strong> тип <code>font_phase</code> каже "32 КБ", <code>image_phase</code> каже "96 КБ", а компілятор одразу знає суму.</p>
+    </section>
+
+    <section class="section">
+      <h2>Перехід Від Плану до Runtime Arena</h2>
+      <div class="code"><pre><code>using decode_layout = a::layout&lt;font_phase, image_phase&gt;;
+constexpr a::memory_req decode_req = decode_layout::requirement();
+
+a::u8 storage[decode_req.bytes] = {};
+a::arena_view arena{storage, sizeof(storage)};
+
+a::typed_scope&lt;decode_layout&gt; frame(arena);
+if (!frame.active()) {
+    return;
+}</code></pre></div>
+      <p class="code-note">
+        <strong>Ланцюжок:</strong> type-level requirement -> фіксований storage -> binding до arena ->
+        активація typed_scope.
+      </p>
     </section>
 
     <section class="section">
@@ -126,12 +165,22 @@ using runtime_req = a::max_req&lt;font_phase, image_phase&gt;;</code></pre></div
           <tr><td><code>require(cond)</code></td><td>Передумова на API/caller межі</td><td><code>require(bytes &gt; 0)</code> перед алокацією</td></tr>
           <tr><td><code>ensure(cond)</code></td><td>Постумова після операції</td><td><code>ensure(offset &lt;= size)</code> після оновлення</td></tr>
           <tr><td><code>invariant(cond)</code></td><td>Внутрішнє правило консистентності</td><td><code>invariant(mark &lt;= size)</code></td></tr>
-          <tr><td><code>assume(cond)</code></td><td>Перевірене припущення + optional optimizer hint</td><td>Гарячий внутрішній шлях зі strict-контрактом</td></tr>
-          <tr><td><code>assume_verified(cond)</code></td><td>Після попереднього доведення/перевірки цієї ж умови</td><td>Fast path після <code>require(is_pow2(align))</code></td></tr>
+          <tr><td><code>require_that&lt;Tag&gt;(cond)</code></td><td>Runtime-перевірка, що створює proof-token</td><td><code>auto p=require_that&lt;align_ok&gt;(is_pow2(align));</code></td></tr>
+          <tr><td><code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code></td><td>Споживає раніше доведений токен</td><td><code>assume_verified(a::move(p))</code></td></tr>
           <tr><td><code>unreachable()</code></td><td>Неможливий control-flow шлях</td><td><code>default:</code> неможлива enum-гілка</td></tr>
         </tbody>
       </table>
       <p class="infobox"><strong>Bounded-значення:</strong> розміри/count/alignment краще моделювати через <code>a::bounded</code> і <code>a::pow2_bounded</code>, щоб валідація відбувалась у момент конструювання типу.</p>
+    </section>
+
+    <section class="section">
+      <h2>Типові Failure-Сценарії</h2>
+      <ul>
+        <li>Використали <code>req_max</code> там, де компоненти реально живуть одночасно.</li>
+        <li>Сприйняли <code>destroy_all()</code> як “закрити scope” (це не так).</li>
+        <li>Плутанина між <code>init_status()</code> і фактичною runtime-usable перевіркою <code>active()</code>.</li>
+        <li>Вихід у raw <code>data()</code> без жорсткого локального контракту.</li>
+      </ul>
     </section>
 
     <section class="section">
@@ -145,6 +194,18 @@ using runtime_req = a::max_req&lt;font_phase, image_phase&gt;;</code></pre></div
 using game = a::sum_req&lt;renderer_state, ui_state&gt;;
 using app_peak = a::max_req&lt;boot, game&gt;;</code></pre></div>
       <p class='code-note'>Цей патерн ділить локальні одночасні layout-и (<code>sum_req</code>) і глобальне пікове планування (<code>max_req</code>) для детермінованого reuse.<br><strong>На пальцях:</strong> всередині однієї фази складаєш блоки, між різними фазами береш просто більший пік.</p>
+    </section>
+
+    <section class="section">
+      <h2>Decision Tree: Що Вибрати?</h2>
+      <table>
+        <thead><tr><th>Питання</th><th>Якщо Так</th><th>Якщо Ні</th></tr></thead>
+        <tbody>
+          <tr><td>Блоки живуть одночасно?</td><td><code>req_sum</code> / <code>sum_req</code></td><td>Йди до наступного питання</td></tr>
+          <tr><td>Фази взаємовиключні і arena реюзається?</td><td><code>req_max</code> / <code>max_req</code></td><td>Використовуй <code>layout</code> + явні фази</td></tr>
+          <tr><td>Потрібен typed lifetime control?</td><td><code>typed_scope&lt;layout&gt;</code></td><td><code>arena_view</code> + <code>scope</code></td></tr>
+        </tbody>
+      </table>
     </section>
 
     <footer class="foot">

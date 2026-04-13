@@ -42,7 +42,19 @@
   <main class="wrap">
     <section class="hero">
       <h1>Practical Recipes</h1>
-      <p>Copy-ready templates for common patterns in <code>a::</code>.</p>
+      <p>
+        This chapter is a workbook: each recipe includes code, intent, and the reasoning behind it.
+        Copy the pattern, then adapt constants and component names for your module.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Before You Start</h2>
+      <ul>
+        <li>Treat each recipe as a contract pattern, not only as syntax.</li>
+        <li>Keep status channels explicit; avoid reducing outcomes to <code>bool</code>.</li>
+        <li>Use <code>sum_req</code> only for coexistence and <code>max_req</code> only for exclusive phases.</li>
+      </ul>
     </section>
 
     <section class="section">
@@ -142,6 +154,29 @@ a::crypto::sha256::digest d = h.final();
 // optionally reuse object
 h.reset();</code></pre></div>
       <p class='code-note'>This is the minimal streaming hash pattern: update in chunks, finalize digest, optionally reset instance for reuse.<br><strong>Plain example:</strong> read a file in 4 KB chunks, feed each chunk to <code>update()</code>, then call <code>final()</code> once.</p>
+    </section>
+
+    <section class="section">
+      <h2>Troubleshooting Guide</h2>
+      <table>
+        <thead><tr><th>Symptom</th><th>Likely Cause</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td><code>status::insufficient_memory</code> in build</td><td>Arena smaller than composed requirement</td><td>Increase arena bytes or split phases with <code>max_req</code></td></tr>
+          <tr><td><code>active()==false</code> right after typed_scope creation</td><td>Init failed due to invalid arena/requirement mismatch</td><td>Check <code>init_status()</code> and requirement validity</td></tr>
+          <tr><td>Unexpected lifetime leak behavior</td><td><code>destroy_all()</code> used without <code>release()</code></td><td>Use <code>release()</code> to close frame and inert scope</td></tr>
+          <tr><td>Wrong memory estimate</td><td><code>req_max</code> used for coexisting components</td><td>Switch to <code>req_sum</code> / <code>sum_req</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>How to Turn a Recipe into a Production Module</h2>
+      <ol>
+        <li>Extract component requirements into named spec types.</li>
+        <li>Add explicit status mapping for each failure category.</li>
+        <li>Write compile-time checks for requirement and layout assumptions.</li>
+        <li>Add runtime tests for normal path and memory-pressure path.</li>
+      </ol>
     </section>
 
     <footer class="foot">

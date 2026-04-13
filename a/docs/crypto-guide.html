@@ -46,6 +46,10 @@
         <code>a::crypto</code> is intentionally minimal: no OS dependency, no hidden heap,
         and explicit caller-owned buffers from input to output.
       </p>
+      <p>
+        The purpose of this chapter is not only to list algorithms, but to teach the operational discipline required
+        for deterministic and safe crypto integration at layer <code>a</code>.
+      </p>
     </section>
 
     <section class="section">
@@ -75,6 +79,19 @@
     </section>
 
     <section class="section">
+      <h2>Lifecycle Model for Sensitive Data</h2>
+      <table>
+        <thead><tr><th>Stage</th><th>What to Do</th><th>What to Avoid</th></tr></thead>
+        <tbody>
+          <tr><td>Input binding</td><td>Use explicit fixed-size views for keys/nonces/tags</td><td>Untyped pointer arithmetic</td></tr>
+          <tr><td>Processing</td><td>Keep data in caller-owned buffers and scoped scratch</td><td>Long-lived copies in unrelated storage</td></tr>
+          <tr><td>Verification</td><td>Use constant-time compare helpers</td><td>Early-exit byte-by-byte checks</td></tr>
+          <tr><td>Cleanup</td><td>Wipe secrets explicitly</td><td>Rely on implicit “eventual overwrite”</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
       <h2>Recommended Usage Pattern</h2>
       <div class="code"><pre><code>a::crypto::aead_chacha20_poly1305::key key{};
 a::crypto::aead_chacha20_poly1305::nonce nonce{};
@@ -97,6 +114,22 @@ if (!ok_open) {
     </section>
 
     <section class="section">
+      <h2>Hashing Pattern for Streams</h2>
+      <div class="code"><pre><code>a::crypto::sha256 h;
+
+while (read_chunk(chunk)) {
+    h.update(chunk);
+}
+
+a::crypto::sha256::digest d = h.final();
+h.reset();</code></pre></div>
+      <p class="code-note">
+        Hash state is incremental and deterministic. Feed chunks in order, finalize once, then reset only when you
+        start a new logical message.
+      </p>
+    </section>
+
+    <section class="section">
       <h2>Integration with <code>a::two_pass</code></h2>
       <p>
         In larger pipelines (batch verification, handshake phases, asset protection),
@@ -107,12 +140,29 @@ if (!ok_open) {
     </section>
 
     <section class="section">
+      <h2>When to Use Fixed-Size Views</h2>
+      <p>
+        Prefer fixed-size views (for example <code>byte_view_n&lt;32&gt;</code>) whenever protocol size is part of
+        correctness.
+      </p>
+      <ul>
+        <li>Keys: fixed by algorithm specification.</li>
+        <li>Nonces/IVs: fixed by mode specification.</li>
+        <li>Tags/MAC outputs: fixed by algorithm output width.</li>
+      </ul>
+      <p class="code-note">
+        This moves size validation from “runtime if spaghetti” into type boundaries.
+      </p>
+    </section>
+
+    <section class="section">
       <h2>Security Notes</h2>
       <ul>
         <li>Never reuse nonce values with ChaCha20-Poly1305.</li>
         <li>Validate MAC/tag before treating plaintext as trusted.</li>
         <li>Avoid unnecessary copies of sensitive buffers; in-place paths are usually safer.</li>
         <li>Use unsafe escape hatches only when the surrounding contract is tightly controlled.</li>
+        <li>Document key ownership clearly: who creates, who uses, who wipes, and when.</li>
       </ul>
     </section>
 

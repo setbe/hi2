@@ -140,7 +140,7 @@
 #    define A_NODISCARD
 #  endif
 #  ifndef A_CONSTEXPR
-#    define A_CONSTEXPR inline
+#    define A_CONSTEXPR constexpr
 #  endif
 #  ifndef A_CONSTEXPR_VAR
 #    define A_CONSTEXPR_VAR const

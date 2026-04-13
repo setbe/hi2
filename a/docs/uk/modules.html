@@ -43,19 +43,31 @@
     <section class="hero">
       <h1>Module Map</h1>
       <p>
-        Карта модулів для швидкої навігації: де живе базова математика, де пам'ять,
-        де two-pass протокол і де криптографічні реалізації.
+        Цей розділ пояснює роль кожного публічного хедера у <code>a/</code>, напрямок залежностей
+        і правила, за якими варто розширювати кодову базу без архітектурного “дрейфу”.
       </p>
     </section>
 
     <section class="section">
-      <h2>Core Headers</h2>
+      <h2>Як Читати Цю Карту</h2>
+      <p>Думай у двох осях:</p>
+      <ul>
+        <li><strong>Шар:</strong> що має залишатися суворо чистим у <code>a</code>.</li>
+        <li><strong>Домен:</strong> memory, contracts, views, math, two-pass, crypto.</li>
+      </ul>
+      <p class="infobox">
+        <strong>Орієнтир:</strong> якщо хедер потребує OS-типів або прихованих алокацій, він не належить до <code>a</code>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Core Headers (Публічна Поверхня)</h2>
       <table>
         <thead><tr><th>Header</th><th>Role</th><th>Main Surface</th></tr></thead>
         <tbody>
           <tr><td><code>a/config.hpp</code></td><td>Feature-detection центр компілятора й архітектури</td><td>Macros: <code>A_COMPILER_*</code>, <code>A_ARCH_*</code>, <code>A_ENDIAN_*</code>, attributes/branch hints</td></tr>
           <tr><td><code>a/profile.hpp</code></td><td>Профіль контрактної політики</td><td><code>profile::level</code>, <code>profile::preset</code>, глобальний <code>current_level</code></td></tr>
-          <tr><td><code>a/contract.hpp</code></td><td>Єдиний механізм контрактів</td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>assume</code>, <code>assume_verified</code>, <code>unreachable</code></td></tr>
+          <tr><td><code>a/contract.hpp</code></td><td>Єдиний механізм контрактів</td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>require_that</code>, <code>assume_verified</code>, <code>unreachable</code></td></tr>
           <tr><td><code>a/bounded.hpp</code></td><td>Constrained scalar value-типи</td><td><code>bounded&lt;T,Min,Max&gt;</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td></tr>
           <tr><td><code>a/types.hpp</code></td><td>Базові fixed-width типи</td><td><code>u8..u64</code>, <code>i8..i64</code>, <code>usize/isize</code>, <code>u128</code>, <code>npos</code></td></tr>
           <tr><td><code>a/status.hpp</code></td><td>Єдиний канал статусів</td><td><code>enum class status</code>, <code>is_ok()</code></td></tr>
@@ -72,7 +84,25 @@
           <tr><td><code>a/a.hpp</code></td><td>Єдиний umbrella include</td><td>Стабільний include-order для всього core</td></tr>
         </tbody>
       </table>
-      <p class="infobox"><strong>Правила контрактів:</strong> на API-межі використовуй <code>require</code>; неможливі гілки позначай <code>unreachable</code>; optimizer hints давай через <code>assume_verified</code> тільки після доведення. Дивись <code>a/CONTRACTS.md</code>.</p>
+      <p class="infobox">
+        <strong>Правило контрактів:</strong> межа API — це <code>require</code>; перевірка з видачею доказу —
+        <code>require_that&lt;Tag&gt;</code>; споживання доказу — <code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code>.
+        Дивись <code>a/CONTRACTS.md</code>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Порядок Залежностей Усередині <code>a/</code></h2>
+      <div class="code"><pre><code>config
+  -> types
+  -> meta / utility
+  -> view / utf8 / bit / math / charconv_base
+  -> memory_requirements / arena
+  -> two_pass
+  -> crypto</code></pre></div>
+      <p class="code-note">
+        <strong>На пальцях:</strong> крипто будується поверх bit/load-store helpers, а не дублює низькорівневу логіку у кожному алгоритмі.
+      </p>
     </section>
 
     <section class="section">
@@ -91,25 +121,35 @@
     </section>
 
     <section class="section">
-      <h2>Internal Headers</h2>
+      <h2>Internal Headers (<code>detail/</code> Поверхня)</h2>
       <div class="grid">
         <article class="card">
           <h3><code>a/detail/arch.hpp</code></h3>
-          <p class="muted">Внутрішні arch-tags і вибір <code>arch_default</code> для platform-specific fast paths.</p>
+          <p class="muted">Внутрішні arch-tags і вибір <code>arch_default</code> для platform-specific fast paths. Тут має жити arch-специфіка, а не у публічному API.</p>
         </article>
         <article class="card">
           <h3><code>a/crypto/detail/load_store.hpp</code></h3>
-          <p class="muted">LE/BE load-store утиліти для криптоалгоритмів поверх <code>a::bit</code>.</p>
+          <p class="muted">Єдине місце LE/BE load-store логіки для криптомодулів поверх <code>a::bit</code>.</p>
         </article>
         <article class="card">
           <h3><code>a/crypto/detail/ct.hpp</code></h3>
-          <p class="muted">Константно-часові порівняння: <code>ct_equal_n</code> і <code>ct_equal</code>.</p>
+          <p class="muted">Константно-часові порівняння: <code>ct_equal_n</code> і <code>ct_equal</code>, щоб уникати таймінгових витоків від раннього виходу.</p>
         </article>
         <article class="card">
           <h3><code>a/crypto/detail/wipe.hpp</code></h3>
-          <p class="muted">Best-effort wipe для секретів через volatile byte loop.</p>
+          <p class="muted">Best-effort wipe для секретів через volatile byte loop; очищення має бути явною фазою, а не “можливо колись перезапишеться”.</p>
         </article>
       </div>
+    </section>
+
+    <section class="section">
+      <h2>Типові Помилки Розміщення</h2>
+      <ul>
+        <li>Пхати scheduler/thread поведінку в <code>a</code> замість <code>b</code>.</li>
+        <li>Додавати API, які роблять hidden allocation.</li>
+        <li>Змішувати OS-wrapper логіку і protocol logic в одному модулі.</li>
+        <li>Виносити platform handles у portable публічні інтерфейси.</li>
+      </ul>
     </section>
 
     <footer class="foot">

@@ -42,39 +42,113 @@
   <main class="wrap">
     <section class="hero">
       <h1>Documentation for <code>a/</code> and the public <code>a::</code> API</h1>
+      <p class="muted">
+        <strong>Keywords:</strong>
+        <code>dependency law</code>,
+        <code>a→b→c→d</code>,
+        <code>freestanding</code>,
+        <code>bare-metal</code>,
+        <code>determinism</code>,
+        <code>capabilities</code>,
+        <code>contracts</code>,
+        <code>two-pass</code>,
+        <code>arena</code>,
+        <code>typed_scope</code>.
+      </p>
       <p>
-        This site is a full guide to layer <code>a</code>: foundational modules, memory algebra,
-        <code>typed_scope</code> lifecycle contracts, <code>a::crypto</code>, and direct links to source.
+        This documentation is written as a learning guide, not a short cheat sheet. The goal is to make the
+        architecture understandable to a newcomer and still rigorous enough for contributors who maintain low-level code.
+      </p>
+      <p>
+        The central model is simple and strict: <code>a</code> is the deterministic foundation, <code>b</code> is
+        capability middleware, <code>c</code> is portable high-level framework space, and <code>d</code> is the
+        application model layer. This website focuses on <code>a</code>, because every higher layer inherits its rules.
       </p>
     </section>
 
     <section class="section">
+      <h2>Who This Is For</h2>
       <div class="grid">
         <article class="card">
-          <h3>Freestanding Core</h3>
-          <p class="muted">Types, metaprogramming and low-level utilities without platform coupling.</p>
-          <p><span class="pill ok">No OS includes</span> <span class="pill ok">Deterministic</span></p>
+          <h3>Students Learning Systems C++</h3>
+          <p class="muted">
+            You know basic C++, but want a practical, deterministic model without <code>std::</code>-centric habits.
+            Start with <a href="cpp-knowledge.html">C++ Knowledge</a>, then <a href="memory-model.html">Memory Model</a>.
+          </p>
         </article>
         <article class="card">
-          <h3>Deterministic Memory</h3>
-          <p class="muted"><code>memory_req</code>, <code>req_sum/req_max</code>, <code>arena_view</code>, <code>scope</code>, <code>typed_scope</code>.</p>
-          <p><span class="pill warn">Unsafe hatch: data()</span></p>
+          <h3>Engine and Firmware Developers</h3>
+          <p class="muted">
+            You need strict ownership, no hidden allocation, and explicit contracts that scale under pressure.
+            Start with <a href="modules.html">Modules</a> and <a href="two-pass-guide.html">Two Pass</a>.
+          </p>
         </article>
         <article class="card">
-          <h3>Crypto in a::crypto</h3>
-          <p class="muted">SHA-256/384, ChaCha20, Poly1305, AEAD, X25519 with caller-owned buffers.</p>
-          <p><span class="pill ok">No hidden heap</span></p>
-        </article>
-        <article class="card">
-          <h3>Contracts + Bounded Values</h3>
-          <p class="muted"><code>profile.hpp</code>, <code>contract.hpp</code>, <code>bounded.hpp</code> for explicit correctness and constrained value types.</p>
-          <p><span class="pill ok">Hard-fail contracts</span> <span class="pill ok">Range-safe types</span></p>
+          <h3>Contributors and Reviewers</h3>
+          <p class="muted">
+            You need precise API invariants and line-level reference. Read <a href="api-atlas.html">API Atlas</a>,
+            then verify exact declarations in <a href="source/index.html">Source</a>.
+          </p>
         </article>
       </div>
     </section>
 
     <section class="section">
-      <h2>Quick Start</h2>
+      <h2>Architecture in One Page</h2>
+      <div class="grid">
+        <article class="card">
+          <h3><code>a::</code> Strict Core</h3>
+          <p class="muted">
+            Core types, views, memory algebra, contracts, and crypto primitives. No OS includes, no hidden heap, no
+            scheduler assumptions.
+          </p>
+          <p><span class="pill ok">Deterministic</span> <span class="pill ok">Freestanding-first</span></p>
+        </article>
+        <article class="card">
+          <h3><code>b::</code> Capability Middleware</h3>
+          <p class="muted">
+            Environment-facing layer (threads, time, sockets, windowing, etc.) exposed through capability contracts.
+            <code>b</code> may depend on <code>a</code>, never the other way around.
+          </p>
+          <p><span class="pill warn">Platform-aware</span></p>
+        </article>
+        <article class="card">
+          <h3><code>c::</code> Portable Frameworks</h3>
+          <p class="muted">
+            High-level abstractions that target portability by consuming capabilities from <code>b</code> and
+            deterministic foundations from <code>a</code>.
+          </p>
+          <p><span class="pill ok">Capability-driven</span></p>
+        </article>
+        <article class="card">
+          <h3><code>d::</code> App Model</h3>
+          <p class="muted">
+            The application-facing layer for declarative/reactive programming styles. It is intentionally built on top
+            of the lower guarantees, not as a replacement for them.
+          </p>
+          <p><span class="pill warn">Highest abstraction</span></p>
+        </article>
+      </div>
+      <p class="infobox">
+        <strong>Dependency law:</strong> <code>a</code> depends on nothing, <code>b</code> may depend on
+        <code>a</code>, <code>c</code> may depend on <code>a+b</code>, <code>d</code> may depend on
+        <code>a+b+c</code>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Core Promises of <code>a::</code></h2>
+      <ul>
+        <li>Memory is explicit: you pass storage in, the API does not silently obtain storage for you.</li>
+        <li>Contracts are explicit: preconditions, invariants, and impossible states are modeled by one system.</li>
+        <li>Composition is explicit: <code>req_sum</code> and <code>req_max</code> express different semantics.</li>
+        <li>Lifetime is explicit: scoped rewind and typed construction/destruction are visible in code.</li>
+        <li>Crypto is explicit: caller-owned buffers and deterministic, size-safe boundaries.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Quick Start (Step by Step)</h2>
       <div class="code"><pre><code>#include "a/a.hpp"
 
 struct font_scratch {
@@ -88,51 +162,58 @@ struct image_scratch {
 using decode_layout = a::layout&lt;font_scratch, image_scratch&gt;;
 
 void run(a::arena_view arena) {
-    a::typed_scope&lt;decode_layout&gt; scope(arena);
-    if (!scope.active()) {
+    a::typed_scope&lt;decode_layout&gt; frame(arena);
+    if (!frame.active()) {
         return;
     }
 
-    auto* font_mem = scope.slot&lt;font_scratch&gt;();
-    auto* image_mem = scope.slot&lt;image_scratch&gt;();
+    auto* font_mem = frame.slot&lt;font_scratch&gt;();
+    auto* image_mem = frame.slot&lt;image_scratch&gt;();
     (void)font_mem;
     (void)image_mem;
 
-    scope.release();
+    frame.release();
 }</code></pre></div>
-      <p class='code-note'>What this snippet does: defines two compile-time components, builds a typed layout, maps slots from caller-provided arena memory, and closes the lifetime with <code>release()</code>.<br><strong>Plain example:</strong> you reserve one fixed buffer at startup, place font scratch and image scratch inside it, use them, then release the frame.</p>
+      <p class="code-note">
+        <strong>Line-by-line intent:</strong><br>
+        1) Each component declares compile-time memory requirement.<br>
+        2) <code>layout&lt;...&gt;</code> computes offsets and total requirement at compile-time.<br>
+        3) <code>typed_scope</code> binds that layout to caller-provided arena memory.<br>
+        4) <code>slot&lt;T&gt;()</code> returns typed storage for each component.<br>
+        5) <code>release()</code> closes the frame and makes the scope inert.
+        <br><strong>Plain example:</strong> one fixed boot-time buffer is reused for temporary font and image work,
+        with no hidden allocation.
+      </p>
     </section>
 
     <section class="section">
-      <h2>Reading Tracks</h2>
+      <h2>Recommended Reading Paths</h2>
       <div class="grid">
         <article class="card">
-          <h3><a href="modules.html">Module Map</a></h3>
-          <p class="muted">Understand the structure fast: who owns what and where layer boundaries are.</p>
+          <h3>Path A: New to This Model</h3>
+          <p class="muted">
+            1) <a href="cpp-knowledge.html">C++ Knowledge</a><br>
+            2) <a href="memory-model.html">Memory Model</a><br>
+            3) <a href="recipes.html">Recipes</a>
+          </p>
         </article>
         <article class="card">
-          <h3><a href="api-atlas.html">API Atlas</a></h3>
-          <p class="muted">A compact map of public types, functions, and key invariants.</p>
+          <h3>Path B: Implementer</h3>
+          <p class="muted">
+            1) <a href="modules.html">Modules</a><br>
+            2) <a href="api-atlas.html">API Atlas</a><br>
+            3) <a href="two-pass-guide.html">Two Pass Guide</a><br>
+            4) <a href="source/index.html">Source</a>
+          </p>
         </article>
         <article class="card">
-          <h3><a href="memory-model.html">Memory Model</a></h3>
-          <p class="muted">Practical logic for <code>req_sum</code>/<code>req_max</code>, layout offsets, and arena lifetimes.</p>
-        </article>
-        <article class="card">
-          <h3><a href="two-pass-guide.html">Two Pass Guide</a></h3>
-          <p class="muted">How to design <code>plan/build</code> modules with strict memory contracts.</p>
-        </article>
-        <article class="card">
-          <h3><a href="crypto-guide.html">Crypto Guide</a></h3>
-          <p class="muted">Algorithms, usage patterns, and practical safety rules.</p>
-        </article>
-        <article class="card">
-          <h3><a href="recipes.html">Recipes</a></h3>
-          <p class="muted">Ready-to-use templates for context memory and typed construction.</p>
-        </article>
-        <article class="card">
-          <h3><a href="cpp-knowledge.html">C++ Knowledge</a></h3>
-          <p class="muted">Iceberg onboarding: from compile/link basics to contracts, arena, scope, and freestanding architecture.</p>
+          <h3>Path C: Crypto-Focused</h3>
+          <p class="muted">
+            1) <a href="crypto-guide.html">Crypto Guide</a><br>
+            2) <a href="memory-model.html">Memory Model</a><br>
+            3) <a href="recipes.html">Recipes</a><br>
+            4) <a href="source/index.html">Source</a>
+          </p>
         </article>
       </div>
     </section>
@@ -146,8 +227,8 @@ void run(a::arena_view arena) {
       <h2>Infographic: typed_scope Lifecycle</h2>
       <img class="infographic" src="assets/typed-scope-lifecycle.svg" alt="typed_scope lifecycle">
       <p class="infobox">
-        <strong>Important:</strong> <code>init_status()==ok</code> does not mean a scope is still usable.
-        Check <code>active()</code> or <code>operator bool()</code>.
+        <strong>Important:</strong> <code>init_status()==ok</code> is constructor outcome only.
+        Runtime usability is defined by <code>active()</code> / <code>operator bool()</code>.
       </p>
     </section>
 
@@ -157,23 +238,27 @@ void run(a::arena_view arena) {
     </section>
 
     <section class="section">
+      <h2>What This Site Is Not</h2>
+      <ul>
+        <li>Not a hidden runtime that auto-manages ownership behind your back.</li>
+        <li>Not a replacement for platform layers (<code>b</code>) that supply real OS capabilities.</li>
+        <li>Not a style guide that prioritizes brevity over explicit correctness.</li>
+      </ul>
+    </section>
+
+    <section class="section">
       <h2>Source Reference</h2>
       <p>
-        New to bare-metal C++ terms? Start with
-        <a href="cpp-knowledge.html">C++ Knowledge</a> first.
+        Start with <a href="cpp-knowledge.html">C++ Knowledge</a> if the terminology is new.
+        Move to <a href="source/index.html">Source</a> when you need exact declarations.
       </p>
       <p>
-        For exact API wording, open
-        <a href="source/index.html">Source Reference</a> and inspect the headers directly.
-      </p>
-      <p>
-        Contract usage quick rules are summarized in
-        <a href="../CONTRACTS.md">a/CONTRACTS.md</a>.
+        Contract decision rules are summarized in <a href="../CONTRACTS.md">a/CONTRACTS.md</a>.
       </p>
     </section>
 
     <footer class="foot">
-      Static docs for repository <code>a/</code>.
+      Static documentation for repository <code>a/</code>.
     </footer>
   </main>
 <script id="project-switch-script">

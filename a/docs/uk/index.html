@@ -41,41 +41,100 @@
 
   <main class="wrap">
     <section class="hero">
-      <h1>Документація <code>a/</code> і всього публічного API <code>a::</code></h1>
+      <h1>Документація <code>a/</code> і публічного API <code>a::</code></h1>
+      <p class="muted">
+        <strong>Ключові слова:</strong>
+        <code>dependency law</code>,
+        <code>a→b→c→d</code>,
+        <code>freestanding</code>,
+        <code>bare-metal</code>,
+        <code>determinism</code>,
+        <code>capabilities</code>,
+        <code>contracts</code>,
+        <code>two-pass</code>,
+        <code>arena</code>,
+        <code>typed_scope</code>.
+      </p>
       <p>
-        Це не просто довідник по хедерах. Тут зібраний цілісний портрет рівня <code>a</code>:
-        базові модулі, memory algebra, lifecycle-контракти <code>typed_scope</code>,
-        криптографічний шар <code>a::crypto</code> і прямі посилання на реальний код.
+        Ця документація задумана як навчальний текст, а не короткий конспект. Вона пояснює не тільки “які є хедери”,
+        а й “чому ця архітектура саме така” і “як її безпечно розвивати”.
+      </p>
+      <p>
+        Модель шарів проста: <code>a</code> — сувора база, <code>b</code> — capability middleware, <code>c</code> —
+        portable high-level framework layer, <code>d</code> — application model. На цій секції фокус саме на
+        <code>a</code>, бо він задає правила для всіх рівнів вище.
       </p>
     </section>
 
     <section class="section">
+      <h2>Для Кого Ця Документація</h2>
       <div class="grid">
         <article class="card">
-          <h3>Freestanding Core</h3>
-          <p class="muted">Типи, метапрограмування і low-level утиліти без платформних залежностей.</p>
-          <p><span class="pill ok">No OS includes</span> <span class="pill ok">Deterministic</span></p>
+          <h3>Студентам C++ Системного Рівня</h3>
+          <p class="muted">
+            Якщо знаєш базу C++, але хочеш мислити детермінованими контрактами, почни з
+            <a href="cpp-knowledge.html">C++ Knowledge</a> і <a href="memory-model.html">Модель Пам'яті</a>.
+          </p>
         </article>
         <article class="card">
-          <h3>Deterministic Memory</h3>
-          <p class="muted"><code>memory_req</code>, <code>req_sum/req_max</code>, <code>arena_view</code>, <code>scope</code>, <code>typed_scope</code>.</p>
-          <p><span class="pill warn">Unsafe hatch: data()</span></p>
+          <h3>Розробникам Рушіїв і Firmware</h3>
+          <p class="muted">
+            Якщо потрібні explicit ownership і відсутність прихованих алокацій, стартуй з
+            <a href="modules.html">Modules</a> та <a href="two-pass-guide.html">Two Pass</a>.
+          </p>
         </article>
         <article class="card">
-          <h3>Crypto in a::crypto</h3>
-          <p class="muted">SHA-256/384, ChaCha20, Poly1305, AEAD, X25519 з caller-owned буферами.</p>
-          <p><span class="pill ok">No hidden heap</span></p>
-        </article>
-        <article class="card">
-          <h3>Контракти + Bounded-Типи</h3>
-          <p class="muted"><code>profile.hpp</code>, <code>contract.hpp</code>, <code>bounded.hpp</code> для явної коректності і constrained value-моделі.</p>
-          <p><span class="pill ok">Hard-fail контракти</span> <span class="pill ok">Range-safe типи</span></p>
+          <h3>Контриб'юторам і Рев'юерам</h3>
+          <p class="muted">
+            Для line-by-line точності: <a href="api-atlas.html">API Атлас</a> + <a href="source/index.html">Source</a>.
+          </p>
         </article>
       </div>
     </section>
 
     <section class="section">
-      <h2>Quick Start</h2>
+      <h2>Архітектура в Одній Картинці</h2>
+      <div class="grid">
+        <article class="card">
+          <h3><code>a::</code> Суворий Core</h3>
+          <p class="muted">Типи, view, memory algebra, контракти, криптопримітиви. Без OS includes, без hidden heap.</p>
+          <p><span class="pill ok">Deterministic</span> <span class="pill ok">Freestanding-first</span></p>
+        </article>
+        <article class="card">
+          <h3><code>b::</code> Capability Middleware</h3>
+          <p class="muted">Шар взаємодії із середовищем (threads/time/net/windowing), який може залежати від <code>a</code>.</p>
+          <p><span class="pill warn">Platform-aware</span></p>
+        </article>
+        <article class="card">
+          <h3><code>c::</code> Portable Frameworks</h3>
+          <p class="muted">Вищі portable абстракції, які спираються на можливості <code>b</code> і правила <code>a</code>.</p>
+          <p><span class="pill ok">Capability-driven</span></p>
+        </article>
+        <article class="card">
+          <h3><code>d::</code> App Model</h3>
+          <p class="muted">Найвищий рівень (декларативні/reactive моделі), який будується поверх нижчих гарантій.</p>
+          <p><span class="pill warn">Highest abstraction</span></p>
+        </article>
+      </div>
+      <p class="infobox">
+        <strong>Dependency law:</strong> <code>a</code> не залежить ні від чого, <code>b</code> залежить тільки від
+        <code>a</code>, <code>c</code> — від <code>a+b</code>, <code>d</code> — від <code>a+b+c</code>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Головні Обіцянки <code>a::</code></h2>
+      <ul>
+        <li>Пам'ять явна: storage передає caller, бібліотека не “дістає пам'ять сама”.</li>
+        <li>Контракти явні: preconditions, invariants і impossible states мають один формальний механізм.</li>
+        <li>Композиція явна: <code>req_sum</code> і <code>req_max</code> означають різні memory-семантики.</li>
+        <li>Lifetime явний: frame/scope і typed construction/destruction завжди видно в коді.</li>
+        <li>Crypto явне: caller-owned buffers і size-safe межі.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Quick Start (З Поясненням)</h2>
       <div class="code"><pre><code>#include "a/a.hpp"
 
 struct font_scratch {
@@ -89,66 +148,72 @@ struct image_scratch {
 using decode_layout = a::layout&lt;font_scratch, image_scratch&gt;;
 
 void run(a::arena_view arena) {
-    a::typed_scope&lt;decode_layout&gt; scope(arena);
-    if (!scope.active()) {
+    a::typed_scope&lt;decode_layout&gt; frame(arena);
+    if (!frame.active()) {
         return;
     }
 
-    auto* font_mem = scope.slot&lt;font_scratch&gt;();
-    auto* image_mem = scope.slot&lt;image_scratch&gt;();
+    auto* font_mem = frame.slot&lt;font_scratch&gt;();
+    auto* image_mem = frame.slot&lt;image_scratch&gt;();
     (void)font_mem;
     (void)image_mem;
 
-    scope.release();
+    frame.release();
 }</code></pre></div>
-      <p class='code-note'>Що робить цей приклад: визначає два compile-time компоненти, збирає typed layout, відображає слоти у пам'ять арени користувача і завершує lifetime через <code>release()</code>.<br><strong>На пальцях:</strong> ти виділив один буфер на старті, поклав у нього scratch для шрифтів і зображень, відпрацював і закрив scope.</p>
+      <p class="code-note">
+        <strong>Що відбувається по кроках:</strong><br>
+        1) Типи-компоненти задають memory-контракт.<br>
+        2) <code>layout&lt;...&gt;</code> на compile-time рахує offsets і загальний розмір.<br>
+        3) <code>typed_scope</code> прив'язує цей layout до реальної arena.<br>
+        4) <code>slot&lt;T&gt;()</code> повертає typed storage для кожного блоку.<br>
+        5) <code>release()</code> закриває frame і робить scope inert.
+        <br><strong>На пальцях:</strong> один буфер на старті, два scratch-блоки всередині, завершення фази без hidden allocations.
+      </p>
     </section>
 
     <section class="section">
-      <h2>Доріжки читання</h2>
+      <h2>Маршрути Читання</h2>
       <div class="grid">
         <article class="card">
-          <h3><a href="modules.html">Module Map</a></h3>
-          <p class="muted">Швидко зрозуміти структуру: що за що відповідає і де проходять межі шарів.</p>
+          <h3>Маршрут A: Новачок у Моделі</h3>
+          <p class="muted">
+            1) <a href="cpp-knowledge.html">C++ Knowledge</a><br>
+            2) <a href="memory-model.html">Модель Пам'яті</a><br>
+            3) <a href="recipes.html">Рецепти</a>
+          </p>
         </article>
         <article class="card">
-          <h3><a href="api-atlas.html">API Атлас</a></h3>
-          <p class="muted">Стисла карта публічних типів, функцій і ключових інваріантів.</p>
+          <h3>Маршрут B: Імплементатор</h3>
+          <p class="muted">
+            1) <a href="modules.html">Modules</a><br>
+            2) <a href="api-atlas.html">API Атлас</a><br>
+            3) <a href="two-pass-guide.html">Two Pass Guide</a><br>
+            4) <a href="source/index.html">Source</a>
+          </p>
         </article>
         <article class="card">
-          <h3><a href="memory-model.html">Модель Пам'яті</a></h3>
-          <p class="muted">Практична логіка <code>req_sum</code>/<code>req_max</code>, layout offset-ів і arena-lifetime.</p>
-        </article>
-        <article class="card">
-          <h3><a href="two-pass-guide.html">Two Pass Guide</a></h3>
-          <p class="muted">Як проектувати <code>plan/build</code> модулі з чітким контрактом пам'яті.</p>
-        </article>
-        <article class="card">
-          <h3><a href="crypto-guide.html">Crypto Guide</a></h3>
-          <p class="muted">Алгоритми, usage-патерни та мінімальні правила безпечного застосування.</p>
-        </article>
-        <article class="card">
-          <h3><a href="recipes.html">Рецепти</a></h3>
-          <p class="muted">Готові шаблони для контекстів, scratch-пам'яті та typed construction.</p>
-        </article>
-        <article class="card">
-          <h3><a href="cpp-knowledge.html">C++ Knowledge</a></h3>
-          <p class="muted">Айсберг-onboarding: від compile/link бази до контрактів, arena, scope і freestanding архітектури.</p>
+          <h3>Маршрут C: Crypto Фокус</h3>
+          <p class="muted">
+            1) <a href="crypto-guide.html">Crypto Guide</a><br>
+            2) <a href="memory-model.html">Модель Пам'яті</a><br>
+            3) <a href="recipes.html">Рецепти</a><br>
+            4) <a href="source/index.html">Source</a>
+          </p>
         </article>
       </div>
     </section>
 
     <section class="section">
-      <h2>Інфографіка: Шари і залежності</h2>
+      <h2>Інфографіка: Шари і Залежності</h2>
       <img class="infographic" src="../assets/architecture.svg" alt="a namespace architecture">
     </section>
 
     <section class="section">
-      <h2>Інфографіка: Життєвий цикл typed_scope</h2>
+      <h2>Інфографіка: Lifecycle у typed_scope</h2>
       <img class="infographic" src="../assets/typed-scope-lifecycle.svg" alt="typed_scope lifecycle">
       <p class="infobox">
-        <strong>Важливо:</strong> <code>init_status()==ok</code> не означає, що scope ще придатний до роботи.
-        Стан перевіряй через <code>active()</code> або <code>operator bool()</code>.
+        <strong>Важливо:</strong> <code>init_status()==ok</code> описує лише результат конструктора.
+        Реальну придатність до роботи визначає <code>active()</code> / <code>operator bool()</code>.
       </p>
     </section>
 
@@ -158,23 +223,25 @@ void run(a::arena_view arena) {
     </section>
 
     <section class="section">
+      <h2>Що Це Точно Не Є</h2>
+      <ul>
+        <li>Не прихований runtime, який сам “якось керує пам'яттю”.</li>
+        <li>Не заміна platform-шару <code>b</code>, який дає доступ до реальних OS capabilities.</li>
+        <li>Не набір стилістичних порад, які можна ігнорувати без наслідків.</li>
+      </ul>
+    </section>
+
+    <section class="section">
       <h2>Source Reference</h2>
       <p>
-        Якщо bare-metal терміни ще нові, почни зі сторінки
-        <a href="cpp-knowledge.html">C++ Knowledge</a>.
+        Якщо терміни нові, почни зі сторінки <a href="cpp-knowledge.html">C++ Knowledge</a>.
+        Якщо потрібна точність по деклараціях, переходь у <a href="source/index.html">Source</a>.
       </p>
-      <p>
-        Якщо потрібна абсолютна точність по API, переходь у
-        <a href="source/index.html">Source Reference</a> і дивись конкретний хедер.
-      </p>
-      <p>
-        Короткі правила по контрактам винесені в
-        <a href="../CONTRACTS.md">a/CONTRACTS.md</a>.
-      </p>
+      <p>Короткі правила по контрактах: <a href="../CONTRACTS.md">a/CONTRACTS.md</a>.</p>
     </section>
 
     <footer class="foot">
-      Static docs for repository <code>a/</code>.
+      Статична документація для репозиторію <code>a/</code>.
     </footer>
   </main>
 <script id="project-switch-script">

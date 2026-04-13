@@ -43,9 +43,17 @@
     <section class="hero">
       <h1>Practical Recipes</h1>
       <p>
-        Тут зібрані короткі робочі шаблони. Ідея проста: взяти патерн, адаптувати під свій layout,
-        і швидко отримати передбачуваний результат без зайвого boilerplate.
+        Це робочий зошит, а не просто збірка фрагментів. Кожен рецепт містить і код, і пояснення контракту.
       </p>
+    </section>
+
+    <section class="section">
+      <h2>Перед Стартом</h2>
+      <ul>
+        <li>Дивись на рецепт як на контрактний патерн, а не лише на синтаксис.</li>
+        <li>Тримай статуси явними; не стискай помилки до <code>bool</code>.</li>
+        <li><code>sum_req</code> — лише для співіснування, <code>max_req</code> — лише для взаємовиключних фаз.</li>
+      </ul>
     </section>
 
     <section class="section">
@@ -145,6 +153,29 @@ a::crypto::sha256::digest d = h.final();
 // optionally reuse object
 h.reset();</code></pre></div>
       <p class='code-note'>Це мінімальний шаблон потокового хешування: оновлюємо чанками, завершуємо digest, за потреби робимо reset для повторного використання.<br><strong>На пальцях:</strong> читаєш файл шматками по 4 КБ, кожен шматок у <code>update()</code>, в кінці один <code>final()</code>.</p>
+    </section>
+
+    <section class="section">
+      <h2>Troubleshooting</h2>
+      <table>
+        <thead><tr><th>Симптом</th><th>Ймовірна Причина</th><th>Що Зробити</th></tr></thead>
+        <tbody>
+          <tr><td><code>status::insufficient_memory</code> у build</td><td>Arena менша за planned requirement</td><td>Збільш arena або розбий фази через <code>max_req</code></td></tr>
+          <tr><td><code>active()==false</code> одразу після create typed_scope</td><td>Помилка init через mismatch вимог</td><td>Перевір <code>init_status()</code> і валідність requirement</td></tr>
+          <tr><td>Дивний lifecycle стан</td><td><code>destroy_all()</code> використано без <code>release()</code></td><td>Закривай frame через <code>release()</code></td></tr>
+          <tr><td>Помилковий memory estimate</td><td><code>req_max</code> застосовано до співіснуючих блоків</td><td>Перейди на <code>req_sum</code>/<code>sum_req</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Як Перетворити Рецепт на Продакшен Модуль</h2>
+      <ol>
+        <li>Винеси вимоги в окремі named spec-типи.</li>
+        <li>Зафіксуй стабільну мапу помилок у <code>a::status</code>.</li>
+        <li>Додай compile-time перевірки для ключових layout припущень.</li>
+        <li>Додай runtime тести для normal path і memory-pressure path.</li>
+      </ol>
     </section>
 
     <footer class="foot">

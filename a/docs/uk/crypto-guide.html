@@ -46,6 +46,10 @@
         Криптографія в <code>a::crypto</code> спроєктована в стилі "нічого зайвого":
         жодної залежності від ОС, жодного прихованого heap, лише чіткий API над caller-owned буферами.
       </p>
+      <p>
+        Ціль цього розділу — не просто перелік алгоритмів, а практична дисципліна використання крипто в
+        детермінованій low-level системі.
+      </p>
     </section>
 
     <section class="section">
@@ -75,6 +79,19 @@
     </section>
 
     <section class="section">
+      <h2>Модель Життєвого Циклу Секретів</h2>
+      <table>
+        <thead><tr><th>Етап</th><th>Що Робити</th><th>Чого Не Робити</th></tr></thead>
+        <tbody>
+          <tr><td>Прив'язка входу</td><td>Використовувати явні fixed-size views для key/nonce/tag</td><td>Сирий pointer arithmetic без size-контракту</td></tr>
+          <tr><td>Обробка</td><td>Працювати в caller-owned buffers і scoped scratch</td><td>Тримати зайві копії секретів поза фазою</td></tr>
+          <tr><td>Перевірка</td><td>Використовувати constant-time compare</td><td>Ранній вихід на першому байті</td></tr>
+          <tr><td>Очистка</td><td>Явно wipe sensitive data</td><td>Покладатись на “само перезапишеться”</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
       <h2>Recommended Usage Pattern</h2>
       <div class="code"><pre><code>a::crypto::aead_chacha20_poly1305::key key{};
 a::crypto::aead_chacha20_poly1305::nonce nonce{};
@@ -97,6 +114,21 @@ if (!ok_open) {
     </section>
 
     <section class="section">
+      <h2>Шаблон Streaming-Hash</h2>
+      <div class="code"><pre><code>a::crypto::sha256 h;
+
+while (read_chunk(chunk)) {
+    h.update(chunk);
+}
+
+a::crypto::sha256::digest d = h.final();
+h.reset();</code></pre></div>
+      <p class="code-note">
+        <strong>Патерн:</strong> update чанками, final один раз, reset лише для нового логічного повідомлення.
+      </p>
+    </section>
+
+    <section class="section">
       <h2>Integration with <code>a::two_pass</code></h2>
       <p>
         У складних пайплайнах (batch verification, handshake phases, asset protection)
@@ -107,12 +139,25 @@ if (!ok_open) {
     </section>
 
     <section class="section">
+      <h2>Коли Потрібні Fixed-Size Views</h2>
+      <ul>
+        <li>Ключі: розмір зафіксований алгоритмом.</li>
+        <li>Nonce/IV: розмір зафіксований режимом.</li>
+        <li>Tag/MAC: довжина визначена специфікацією алгоритму.</li>
+      </ul>
+      <p class="code-note">
+        Це переносить size-валидацію з runtime-розгалужень на межу типу.
+      </p>
+    </section>
+
+    <section class="section">
       <h2>Security Notes</h2>
       <ul>
         <li>Не повторюй nonce для ChaCha20-Poly1305.</li>
         <li>Перевіряй MAC/tag до того, як вважати plaintext довіреним.</li>
         <li>Уникай зайвих копій секретних буферів; in-place обробка зазвичай краща.</li>
         <li>Unsafe escape hatch використовуйте лише там, де контракт реально контрольований.</li>
+        <li>Явно фіксуй ownership ключів: хто створює, хто використовує, хто очищає.</li>
       </ul>
     </section>
 

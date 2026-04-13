@@ -47,6 +47,9 @@
         Спочатку рахуємо і валідуємо вимоги, потім будуємо результат у заданій arena,
         без випадкових алокацій і розмитих error-сигналів.
       </p>
+      <p>
+        Якщо модуль не може чесно описати memory-форму до build-фази, такий модуль ще сирий для цього шару.
+      </p>
     </section>
 
     <section class="section">
@@ -95,6 +98,20 @@ struct traits&lt;image_plan, image_input&gt; {
     </section>
 
     <section class="section">
+      <h2>Що Дозволено в Кожній Фазі</h2>
+      <table>
+        <thead><tr><th>Фаза</th><th>Дозволено</th><th>Заборонено</th></tr></thead>
+        <tbody>
+          <tr><td><code>plan()</code></td><td>Валідація, ліміти, розрахунок вимог</td><td>Мутувати output buffers або робити hidden allocation</td></tr>
+          <tr><td><code>build()</code></td><td>Спожити затверджений план, працювати в наданій arena</td><td>Підміняти вимоги “на льоту”</td></tr>
+        </tbody>
+      </table>
+      <p class="infobox">
+        <strong>Практичний тест:</strong> однаковий input має давати однаковий plan/status/memory-контракт.
+      </p>
+    </section>
+
+    <section class="section">
       <h2>Status Discipline</h2>
       <ul>
         <li>Не зводь помилки до <code>bool</code>: повертай <code>a::status</code>.</li>
@@ -102,6 +119,16 @@ struct traits&lt;image_plan, image_input&gt; {
         <li>Порушення контракту: <code>invalid_input</code>, <code>mismatch</code>, <code>overflow</code>.</li>
         <li>Помилки декодера/бекенда: <code>unsupported</code> або <code>backend_failure</code>.</li>
       </ul>
+    </section>
+
+    <section class="section">
+      <h2>Єдина Мапа Помилок</h2>
+      <div class="code"><pre><code>invalid_input        // payload не відповідає контракту
+overflow             // арифметичне переповнення при розрахунках
+insufficient_memory  // arena замала відносно плану
+mismatch             // build викликано з неузгодженим планом
+unsupported          // формат/можливість не підтримується
+backend_failure      // бекенд повернув операційну помилку</code></pre></div>
     </section>
 
     <section class="section">
@@ -134,6 +161,30 @@ using peak = a::max_req&lt;boot, run&gt;;</code></pre></div>
         <li>Секрети в crypto-шляхах очищаються через wipe helper.</li>
         <li>Публічний API не містить platform/OS типів.</li>
       </ul>
+    </section>
+
+    <section class="section">
+      <h2>Типові Anti-Patterns</h2>
+      <ul>
+        <li>Повернення <code>bool</code> замість структурованого <code>a::status</code>.</li>
+        <li>Виклик <code>build()</code> з сирими user-полями, а не з перевіреним <code>plan</code>.</li>
+        <li>Приховані алокації поза arena-контрактом.</li>
+        <li>Нестабільне трактування однакових помилок між модулями.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Рев'ю-Чеклист для Нового Two-Pass Модуля</h2>
+      <table>
+        <thead><tr><th>Питання</th><th>Очікувана Відповідь</th></tr></thead>
+        <tbody>
+          <tr><td>Plan детермінований для однакового input?</td><td>Так</td></tr>
+          <tr><td>Build може вийти за межі плану?</td><td>Ні</td></tr>
+          <tr><td>Усі збої мапляться в <code>a::status</code>?</td><td>Так, зі стабільною семантикою</td></tr>
+          <tr><td>Є wipe-path для секретних даних?</td><td>Так, явно</td></tr>
+          <tr><td>Публічний API містить platform типи?</td><td>Ні</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <footer class="foot">

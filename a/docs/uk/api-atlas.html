@@ -43,8 +43,8 @@
     <section class="hero">
       <h1>API Атлас</h1>
       <p>
-        Якщо Module Map показує архітектуру, то Atlas показує точні точки входу:
-        які типи існують, що вони гарантують і де найчастіше помиляються.
+        Якщо Module Map показує архітектуру, то Atlas показує контрактну карту:
+        які типи існують, що саме вони гарантують і як їх правильно комбінувати.
       </p>
     </section>
 
@@ -65,6 +65,10 @@
           <tr><td><code>a::two_pass::scope&lt;Ts...&gt;</code></td><td>runtime object</td><td>Convenience wrapper over <code>a::typed_scope&lt;a::layout&lt;Ts...&gt;&gt;</code></td></tr>
         </tbody>
       </table>
+      <p class="code-note">
+        <strong>Ментальна модель:</strong> <code>memory_req</code> описує, <code>layout</code> компонує,
+        <code>typed_scope</code> виконує.
+      </p>
     </section>
 
     <section class="section">
@@ -87,6 +91,9 @@
           <p class="muted">Для побудови в <code>typed_scope</code> компоненти мають бути nothrow-constructible і nothrow-destructible.</p>
         </article>
       </div>
+      <p class="infobox">
+        <strong>Основний інваріант:</strong> якщо <code>active()==false</code>, scope не usable; inert-стан означає порожній constructed-state.
+      </p>
     </section>
 
     <section class="section">
@@ -95,17 +102,31 @@
         <thead><tr><th>File</th><th>Main Surface</th><th>When to Use</th></tr></thead>
         <tbody>
           <tr><td><code>a/profile.hpp</code></td><td><code>profile::level</code>, <code>preset</code>, <code>current_level</code></td><td>Вибір build-wide контрактного режиму (<code>strict</code>/<code>audit</code>/<code>lean</code>)</td></tr>
-          <tr><td><code>a/contract.hpp</code></td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>assume</code>, <code>assume_verified</code>, <code>unreachable</code></td><td>Жорсткі hard-fail контракти для коректності</td></tr>
+          <tr><td><code>a/contract.hpp</code></td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>require_that</code>, <code>assume_verified</code>, <code>unreachable</code></td><td>Жорсткі hard-fail контракти для коректності</td></tr>
           <tr><td><code>a/bounded.hpp</code></td><td><code>bounded</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td><td>Розміри/count/alignment як валідовані типи</td></tr>
         </tbody>
       </table>
       <ul>
         <li><code>require</code>: передумови на межі API/caller.</li>
-        <li><code>assume</code>: перевірене припущення (panic на false, optional optimizer hint на true).</li>
-        <li><code>assume_verified</code>: для умов, вже доведених попередніми перевірками; той самий failure-контракт, що і <code>assume</code>.</li>
+        <li><code>require_that&lt;Tag&gt;</code>: runtime-перевірка з випуском proof-token.</li>
+        <li><code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code>: одноразове споживання proof-token у trusted path.</li>
         <li>Trusted path у bounded-типах є internal-only конструюванням, а не шляхом обходу валідації user input.</li>
       </ul>
       <p class="infobox"><strong>Дивись:</strong> <code>a/CONTRACTS.md</code> для коротких правил вибору.</p>
+    </section>
+
+    <section class="section">
+      <h2>Lifecycle API за Наміром</h2>
+      <table>
+        <thead><tr><th>Намір</th><th>API</th><th>Що це не робить</th></tr></thead>
+        <tbody>
+          <tr><td>Отримати raw storage для компонента</td><td><code>slot&lt;T&gt;()</code></td><td>Не запускає object lifetime</td></tr>
+          <tr><td>Запустити typed lifetime</td><td><code>construct&lt;T&gt;(...)</code></td><td>Не закриває scope автоматично</td></tr>
+          <tr><td>Завершити один об'єкт</td><td><code>destroy&lt;T&gt;()</code></td><td>Не закриває frame</td></tr>
+          <tr><td>Завершити всі сконструйовані об'єкти</td><td><code>destroy_all()</code></td><td>Не робить scope inert</td></tr>
+          <tr><td>Закрити frame і інертнути scope</td><td><code>release()</code></td><td>Не зберігає подальшу usable-роботу</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <section class="section">
@@ -138,7 +159,12 @@
     </section>
 
     <section class="section">
-      <h2>Detailed Source</h2>
+      <h2>Як Практично Користуватися Атласом</h2>
+      <ul>
+        <li>Під час імплементації: спочатку звір намір API з таблицями тут, потім пиши код.</li>
+        <li>Під час рев'ю: перевір, що нові символи не ламають уже зафіксовані інваріанти.</li>
+        <li>Під час дебагу: спочатку класифікуй порушення (precondition/invariant/lifetime), потім шукай точку поломки.</li>
+      </ul>
       <p>Для line-by-line звірки переходь у <a href="source/index.html">Source Reference</a>.</p>
     </section>
 

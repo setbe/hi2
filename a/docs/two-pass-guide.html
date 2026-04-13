@@ -46,6 +46,10 @@
         <code>a::two_pass</code> is a planning discipline, not just another API.
         First you validate and size memory, then you build into a known arena region.
       </p>
+      <p>
+        If your module cannot explain its memory shape before execution, it is not a strong fit for this layer.
+        Two-pass design exists to make that shape explicit.
+      </p>
     </section>
 
     <section class="section">
@@ -94,6 +98,21 @@ struct traits&lt;image_plan, image_input&gt; {
     </section>
 
     <section class="section">
+      <h2>What Each Phase Is Allowed to Do</h2>
+      <table>
+        <thead><tr><th>Phase</th><th>Allowed</th><th>Disallowed</th></tr></thead>
+        <tbody>
+          <tr><td><code>plan()</code></td><td>Input validation, limit checks, requirement computation</td><td>Mutating output buffers, hidden allocation, irreversible side effects</td></tr>
+          <tr><td><code>build()</code></td><td>Consume approved plan, allocate inside provided arena, produce result</td><td>Changing requirement semantics mid-flight, bypassing plan constraints</td></tr>
+        </tbody>
+      </table>
+      <p class="infobox">
+        <strong>Practical test:</strong> if two identical <code>plan()</code> calls can yield incompatible memory
+        contracts for identical input, the module is not deterministic enough for this pattern.
+      </p>
+    </section>
+
+    <section class="section">
       <h2>Status Discipline</h2>
       <ul>
         <li>Do not collapse outcomes into <code>bool</code>; return <code>a::status</code>.</li>
@@ -101,6 +120,19 @@ struct traits&lt;image_plan, image_input&gt; {
         <li>Use <code>invalid_input</code>, <code>mismatch</code>, <code>overflow</code> for contract violations.</li>
         <li>Use <code>unsupported</code> or <code>backend_failure</code> for backend/decode issues.</li>
       </ul>
+    </section>
+
+    <section class="section">
+      <h2>Reference Error Mapping</h2>
+      <div class="code"><pre><code>invalid_input        // user payload violates declared bounds
+overflow             // arithmetic overflow in requirement calculus
+insufficient_memory  // provided arena smaller than planned requirement
+mismatch             // build called with stale or incompatible plan
+unsupported          // format/backend feature not available
+backend_failure      // backend returned hard operational failure</code></pre></div>
+      <p class="code-note">
+        Keep these meanings stable across modules. Shared vocabulary reduces ambiguity in logs, tests, and API reviews.
+      </p>
     </section>
 
     <section class="section">
@@ -133,6 +165,30 @@ using peak = a::max_req&lt;boot, run&gt;;</code></pre></div>
         <li>Sensitive data is wiped in crypto paths.</li>
         <li>Public API remains free of platform/OS types.</li>
       </ul>
+    </section>
+
+    <section class="section">
+      <h2>Common Anti-Patterns</h2>
+      <ul>
+        <li>Returning <code>bool</code> from <code>plan()</code> and losing structured failure semantics.</li>
+        <li>Calling <code>build()</code> with unchecked user values instead of the planned object.</li>
+        <li>Encoding runtime-variant memory behavior without reflecting it in <code>memory_req</code>.</li>
+        <li>Quietly allocating side memory outside arena contracts.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Review Checklist for New Two-Pass Modules</h2>
+      <table>
+        <thead><tr><th>Question</th><th>Expected Answer</th></tr></thead>
+        <tbody>
+          <tr><td>Is plan deterministic for equal input?</td><td>Yes, same input => same status/plan/requirement</td></tr>
+          <tr><td>Can build exceed planned requirement?</td><td>No, never</td></tr>
+          <tr><td>Are all failure modes mapped to <code>a::status</code>?</td><td>Yes, with stable category meaning</td></tr>
+          <tr><td>Is secret data wiped where relevant?</td><td>Yes, via explicit wipe paths</td></tr>
+          <tr><td>Are platform types exposed in public API?</td><td>No</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <footer class="foot">

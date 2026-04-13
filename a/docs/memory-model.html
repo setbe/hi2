@@ -46,6 +46,10 @@
         In <code>a::</code>, memory is explicit. You define requirements first,
         then provide real storage, and execution stays inside those boundaries.
       </p>
+      <p>
+        This chapter teaches the model in the same order you use it in code:
+        requirement calculus, compile-time composition, runtime frame usage, and contract enforcement.
+      </p>
     </section>
 
     <section class="section">
@@ -87,6 +91,23 @@ result.align = max(a.align, b.align)</code></pre></div>
     </section>
 
     <section class="section">
+      <h2>Worked Numeric Example</h2>
+      <div class="code"><pre><code>// A = { bytes: 20, align: 4  }
+// B = { bytes: 48, align: 16 }
+// C = { bytes: 12, align: 8  }
+
+ab_start = align_up(20, 16) = 32
+ab      = { bytes: 32 + 48 = 80, align: max(4,16) = 16 }
+
+abc_start = align_up(80, 8) = 80
+abc       = { bytes: 80 + 12 = 92, align: max(16,8) = 16 }</code></pre></div>
+      <p class="code-note">
+        <strong>Interpretation:</strong> 92 bytes is the packed coexistence requirement for A+B+C.
+        If these were exclusive phases instead, <code>req_max</code> would choose the largest bytes/alignment pair.
+      </p>
+    </section>
+
+    <section class="section">
       <h2>Compile-Time Composition by Types</h2>
       <div class="code"><pre><code>struct font_phase {
     static constexpr a::memory_req requirement() noexcept { return {32 * 1024, 16}; }
@@ -102,6 +123,25 @@ constexpr a::memory_req load_req = load_layout::requirement();
 using boot_req = a::sum_req&lt;font_phase, image_phase&gt;;
 using runtime_req = a::max_req&lt;font_phase, image_phase&gt;;</code></pre></div>
       <p class='code-note'>This example shows type-level memory contracts: every type exposes <code>requirement()</code>, and composition happens fully at compile time.<br><strong>Plain example:</strong> <code>font_phase</code> says "32 KB", <code>image_phase</code> says "96 KB", and the compiler precomputes the total before run.</p>
+    </section>
+
+    <section class="section">
+      <h2>From Compile-Time Plan to Runtime Arena</h2>
+      <div class="code"><pre><code>using decode_layout = a::layout&lt;font_phase, image_phase&gt;;
+constexpr a::memory_req decode_req = decode_layout::requirement();
+
+a::u8 storage[decode_req.bytes] = {};
+a::arena_view arena{storage, sizeof(storage)};
+
+a::typed_scope&lt;decode_layout&gt; frame(arena);
+if (!frame.active()) {
+    return;
+}</code></pre></div>
+      <p class="code-note">
+        <strong>Pipeline:</strong> type-level requirement -> fixed storage -> arena binding -> typed scope activation.
+        <br><strong>Plain example:</strong> the compiler tells you exact minimum bytes, then runtime only checks that
+        the provided arena satisfies that contract.
+      </p>
     </section>
 
     <section class="section">
@@ -125,12 +165,22 @@ using runtime_req = a::max_req&lt;font_phase, image_phase&gt;;</code></pre></div
           <tr><td><code>require(cond)</code></td><td>API/caller precondition</td><td><code>require(bytes &gt; 0)</code> before allocation</td></tr>
           <tr><td><code>ensure(cond)</code></td><td>Postcondition after operation</td><td><code>ensure(offset &lt;= size)</code> after update</td></tr>
           <tr><td><code>invariant(cond)</code></td><td>Internal consistency rule</td><td><code>invariant(mark &lt;= size)</code></td></tr>
-          <tr><td><code>assume(cond)</code></td><td>Checked assumption + optional optimizer hint</td><td>Hot internal branch with strict contract</td></tr>
-          <tr><td><code>assume_verified(cond)</code></td><td>After prior proof/check of the same condition</td><td>Fast path after <code>require(is_pow2(align))</code></td></tr>
+          <tr><td><code>require_that&lt;Tag&gt;(cond)</code></td><td>Runtime check that mints proof token</td><td><code>auto p=require_that&lt;align_ok&gt;(is_pow2(align));</code></td></tr>
+          <tr><td><code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code></td><td>Consume previously proven token</td><td><code>assume_verified(a::move(p))</code></td></tr>
           <tr><td><code>unreachable()</code></td><td>Impossible control flow</td><td><code>default:</code> impossible enum branch</td></tr>
         </tbody>
       </table>
       <p class="infobox"><strong>Bounded values:</strong> model dimensions/counts/alignment via <code>a::bounded</code> and <code>a::pow2_bounded</code> to move validation into type construction.</p>
+    </section>
+
+    <section class="section">
+      <h2>Common Failure Modes</h2>
+      <ul>
+        <li>Using <code>req_max</code> where components are actually alive at the same time.</li>
+        <li>Assuming <code>destroy_all()</code> closes a typed scope (it does not).</li>
+        <li>Treating <code>init_status()</code> as a perpetual validity flag.</li>
+        <li>Bypassing typed lifecycle discipline via raw <code>data()</code> without strict local reasoning.</li>
+      </ul>
     </section>
 
     <section class="section">
@@ -144,6 +194,18 @@ using runtime_req = a::max_req&lt;font_phase, image_phase&gt;;</code></pre></div
 using game = a::sum_req&lt;renderer_state, ui_state&gt;;
 using app_peak = a::max_req&lt;boot, game&gt;;</code></pre></div>
       <p class='code-note'>This pattern separates local simultaneous layouts (<code>sum_req</code>) from global peak planning (<code>max_req</code>) for deterministic reuse.<br><strong>Plain example:</strong> inside one phase you sum required blocks, across different phases you keep only the larger peak.</p>
+    </section>
+
+    <section class="section">
+      <h2>Decision Tree: Which Primitive Do I Need?</h2>
+      <table>
+        <thead><tr><th>Question</th><th>If Yes</th><th>If No</th></tr></thead>
+        <tbody>
+          <tr><td>Do blocks coexist in the same lifetime window?</td><td>Use <code>req_sum</code>/<code>sum_req</code></td><td>Go to next question</td></tr>
+          <tr><td>Are phases mutually exclusive and arena-reused?</td><td>Use <code>req_max</code>/<code>max_req</code></td><td>Use <code>layout</code> and explicit phase boundaries</td></tr>
+          <tr><td>Need typed slots and object lifetime tracking?</td><td>Use <code>typed_scope&lt;layout&gt;</code></td><td>Use raw <code>arena_view</code> + <code>scope</code></td></tr>
+        </tbody>
+      </table>
     </section>
 
     <footer class="foot">
