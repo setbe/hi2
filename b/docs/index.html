@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>b:: Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand brand-switch">
+        <select class="proj-select" aria-label="Project docs" title="Switch a/b/c/d docs">
+          <option value="a">a::</option>
+          <option value="b">b::</option>
+          <option value="c">c::</option>
+          <option value="d">d::</option>
+        </select>
+        <span class="brand-tail">os-middleware docs</span>
+      </div>
+      <nav class="nav">
+        <a href="index.html">Overview</a>
+        <a href="modules.html">Modules</a>
+        <a href="porting.html">Porting</a>
+        <a href="source/index.html">Source</a>
+      </nav>
+      <div class="lang-switch" aria-label="Language selector">
+        <a class="flag active" href="index.html" title="English" lang="en">????</a>
+        <a class="flag" href="uk/index.html" title="??????????" lang="uk">????</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Documentation for <code>b/</code> and public <code>b::</code> API</h1>
+      <p class="muted">
+        <strong>Keywords:</strong>
+        <code>capabilities</code>,
+        <code>os middleware</code>,
+        <code>thin wrappers</code>,
+        <code>no OS types in public API</code>,
+        <code>RAII for ownership resources</code>.
+      </p>
+      <p>
+        <code>b::</code> is a capability layer between pure <code>a::</code> and higher frameworks in <code>c::</code>.
+        It is intentionally thin: it exposes stable API contracts and delegates platform specifics to port backends.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Dependency Law</h2>
+      <ul>
+        <li><code>b</code> may depend only on <code>a</code>.</li>
+        <li>Public <code>b/*.hpp</code> headers must stay platform-neutral.</li>
+        <li>Platform backends live in <code>b/ports/&lt;platform&gt;/*.cpp</code>.</li>
+        <li><code>c::</code> depends on capabilities, not on OS names.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Current Public Surface</h2>
+      <table>
+        <thead><tr><th>Module</th><th>Role</th><th>Main API</th></tr></thead>
+        <tbody>
+          <tr><td><code>b/time.hpp</code></td><td>Monotonic time + sleep</td><td><code>monotonic_now_ns</code>, <code>monotonic_ms</code>, <code>sleep_ms</code></td></tr>
+          <tr><td><code>b/thread.hpp</code></td><td>Thread identity + scheduling hint</td><td><code>thread_current</code>, <code>thread_yield</code></td></tr>
+          <tr><td><code>b/net/socket.hpp</code></td><td>Non-blocking UDP socket capability</td><td><code>socket_open_udp</code>, <code>socket_send_to</code>, <code>socket_recv_result</code>, <code>udp_socket</code></td></tr>
+          <tr><td><code>b/capabilities.hpp</code></td><td>Build-time feature switches</td><td><code>B_HAS_TIME</code>, <code>B_HAS_THREADS</code>, <code>B_HAS_SOCKETS</code>, <code>b::cap::*</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Error Model</h2>
+      <p>
+        Socket receive no longer uses magic values like <code>-1</code>/<code>-2</code>. It returns
+        <code>socket_recv_result { status, bytes, from }</code>.
+      </p>
+      <div class="code"><pre><code>b::socket_recv_result r = b::socket_recv_from(sock, out);
+if (r.status == b::socket_status::ok) {
+    // r.bytes bytes from r.from
+} else if (r.status == b::socket_status::would_block) {
+    // non-blocking socket has no packet yet
+}</code></pre></div>
+    </section>
+
+    <section class="section">
+      <h2>RAII Policy in b::</h2>
+      <ul>
+        <li>Use RAII for ownership resources (socket/file/window/map).</li>
+        <li>Use free functions for stateless queries (time, yield, current id).</li>
+        <li>Do not grow <code>b</code> into high-level protocol/framework layer.</li>
+      </ul>
+    </section>
+
+    <footer class="foot">
+      Static documentation for repository <code>b/</code>.
+    </footer>
+  </main>
+<script id="project-switch-script">
+(function () {
+  var select = document.querySelector('.proj-select');
+  if (!select) return;
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
+  var segments = splitPath(window.location.pathname || '');
+  var projects = { a: true, b: true, c: true, d: true };
+  var projectIndex = -1;
+  for (var i = 0; i < segments.length - 1; i++) {
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
+  }
+
+  var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'b';
+  select.value = currentProject;
+
+  var prefix = '/';
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  select.addEventListener('change', function (e) {
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    window.location.href = prefix + e.target.value + '/docs/index.html' + query + hash;
+  });
+})();
+</script>
+</body>
+</html>

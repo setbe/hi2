@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="uk">
 <head>
   <meta charset="utf-8">
@@ -134,43 +134,36 @@ A_FORCE_INLINE void assume(bool cond) noexcept {
 (function () {
   var select = document.querySelector('.proj-select');
   if (!select) return;
-  function splitPath(path) { return path.split('/').filter(function (s) { return s.length > 0; }); }
+
+  function splitPath(path) {
+    return path.split('/').filter(function (s) { return s.length > 0; });
+  }
+
   var segments = splitPath(window.location.pathname || '');
   var projects = { a: true, b: true, c: true, d: true };
   var projectIndex = -1;
   for (var i = 0; i < segments.length - 1; i++) {
-    if (projects[segments[i]] && segments[i + 1] === 'docs') { projectIndex = i; break; }
+    if (projects[segments[i]] && segments[i + 1] === 'docs') {
+      projectIndex = i;
+      break;
+    }
   }
+
   var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
   select.value = currentProject;
-  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
-  if (!suffix) suffix = 'index.html';
+
   var prefix = '/';
-  if (projectIndex > 0) { prefix = '/' + segments.slice(0, projectIndex).join('/') + '/'; }
-  function targetUrl(project, relativePath) {
+  if (projectIndex > 0) {
+    prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
+  }
+
+  select.addEventListener('change', function (e) {
     var hash = window.location.hash || '';
     var query = window.location.search || '';
-    return prefix + project + '/docs/' + relativePath + query + hash;
-  }
-  function fallbackUrl(project) {
-    var hash = window.location.hash || '';
-    var query = window.location.search || '';
-    return prefix + project + '/docs/index.html' + query + hash;
-  }
-  async function switchProject(project) {
-    var preferred = targetUrl(project, suffix);
-    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
-      window.location.href = preferred;
-      return;
-    }
-    try {
-      var res = await fetch(preferred, { method: 'HEAD' });
-      if (res && res.ok) { window.location.href = preferred; return; }
-    } catch (e) {}
-    window.location.href = fallbackUrl(project);
-  }
-  select.addEventListener('change', function (e) { switchProject(e.target.value); });
+    window.location.href = prefix + e.target.value + '/docs/index.html' + query + hash;
+  });
 })();
 </script>
 </body>
 </html>
+

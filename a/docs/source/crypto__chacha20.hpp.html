@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -27,8 +27,8 @@
         <a href="../api-atlas.html">API Atlas</a><a href="../cpp-knowledge.html">C++ Knowledge</a><a href="index.html">Source Index</a>
       </nav>
       <div class="lang-switch" aria-label="Language selector">
-        <a class="flag active" href="crypto__chacha20.hpp.html" title="English" lang="en">🇬🇧</a>
-        <a class="flag" href="../uk/source/crypto__chacha20.hpp.html" title="Українська" lang="uk">🇺🇦</a>
+        <a class="flag active" href="crypto__chacha20.hpp.html" title="English" lang="en">????</a>
+        <a class="flag" href="../uk/source/crypto__chacha20.hpp.html" title="??????????" lang="uk">????</a>
       </div>
     </div>
   </header>
@@ -274,53 +274,20 @@ namespace crypto {
   var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
   select.value = currentProject;
 
-  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
-  if (!suffix) suffix = 'index.html';
-
   var prefix = '/';
   if (projectIndex > 0) {
     prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
   }
 
-  function targetUrl(project, relativePath) {
-    var hash = window.location.hash || '';
-    var query = window.location.search || '';
-    return prefix + project + '/docs/' + relativePath + query + hash;
-  }
-
-  function fallbackUrl(project) {
-    var hash = window.location.hash || '';
-    var query = window.location.search || '';
-    return prefix + project + '/docs/index.html' + query + hash;
-  }
-
-  async function switchProject(project) {
-    var preferred = targetUrl(project, suffix);
-
-    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
-      window.location.href = preferred;
-      return;
-    }
-
-    try {
-      var res = await fetch(preferred, { method: 'HEAD' });
-      if (res && res.ok) {
-        window.location.href = preferred;
-        return;
-      }
-    } catch (e) {
-      // ignore and use fallback
-    }
-
-    window.location.href = fallbackUrl(project);
-  }
-
   select.addEventListener('change', function (e) {
-    switchProject(e.target.value);
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    window.location.href = prefix + e.target.value + '/docs/index.html' + query + hash;
   });
 })();
 </script>
 </body>
 </html>
+
 
 

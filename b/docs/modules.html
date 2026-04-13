@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>b:: Modules</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top"><div class="wrap"><div class="brand brand-switch"><select class="proj-select" aria-label="Project docs"><option value="a">a::</option><option value="b">b::</option><option value="c">c::</option><option value="d">d::</option></select><span class="brand-tail">os-middleware docs</span></div><nav class="nav"><a href="index.html">Overview</a><a href="modules.html">Modules</a><a href="porting.html">Porting</a><a href="source/index.html">Source</a></nav><div class="lang-switch"><a class="flag active" href="modules.html">????</a><a class="flag" href="uk/modules.html">????</a></div></div></header>
+<main class="wrap">
+<section class="hero"><h1>b:: Module Map</h1><p>Each capability is independent and can be present or absent per platform.</p></section>
+<section class="section"><h2>Implemented Capabilities</h2>
+<table><thead><tr><th>Capability</th><th>Public Header</th><th>Backend files</th></tr></thead><tbody>
+<tr><td>Time</td><td><code>b/time.hpp</code></td><td><code>b/ports/windows/time.cpp</code>, <code>b/ports/linux/time.cpp</code></td></tr>
+<tr><td>Threads</td><td><code>b/thread.hpp</code></td><td><code>b/ports/windows/thread.cpp</code>, <code>b/ports/linux/thread.cpp</code></td></tr>
+<tr><td>Sockets (UDP)</td><td><code>b/net/socket.hpp</code></td><td><code>b/ports/windows/socket.cpp</code>, <code>b/ports/linux/socket.cpp</code></td></tr>
+</tbody></table>
+</section>
+<section class="section"><h2>Header/Source Split</h2>
+<ul>
+<li>Public API declarations stay in <code>b/*.hpp</code> and <code>b/net/*.hpp</code>.</li>
+<li>Port contract declarations are in <code>b/detail/port_contract.hpp</code>.</li>
+<li>Public wrappers are in <code>b/*.cpp</code>.</li>
+<li>OS-specific implementations are in <code>b/ports/&lt;platform&gt;/*.cpp</code>.</li>
+</ul>
+</section>
+<footer class="foot">b:: modules documentation.</footer></main>
+<script id="project-switch-script">(function(){var select=document.querySelector('.proj-select');if(!select)return;function splitPath(path){return path.split('/').filter(function(s){return s.length>0;});}var segments=splitPath(window.location.pathname||'');var projects={a:true,b:true,c:true,d:true};var projectIndex=-1;for(var i=0;i<segments.length-1;i++){if(projects[segments[i]]&&segments[i+1]==='docs'){projectIndex=i;break;}}var currentProject=projectIndex>=0?segments[projectIndex]:'b';select.value=currentProject;var prefix='/';if(projectIndex>0){prefix='/' + segments.slice(0,projectIndex).join('/') + '/';}select.addEventListener('change',function(e){var hash=window.location.hash||'';var query=window.location.search||'';window.location.href=prefix+e.target.value+'/docs/index.html'+query+hash;});})();</script>
+</body></html>

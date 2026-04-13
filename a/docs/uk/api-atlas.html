@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="uk">
 <head>
   <meta charset="utf-8">
@@ -22,29 +22,29 @@
         <span class="brand-tail">API atlas</span>
       </div>
       <nav class="nav">
-        <a href="index.html">Огляд</a>
-        <a href="modules.html">Модулі</a>
-        <a href="api-atlas.html">API Атлас</a>
-        <a href="memory-model.html">Модель Пам'яті</a>
+        <a href="index.html">?????</a>
+        <a href="modules.html">??????</a>
+        <a href="api-atlas.html">API ?????</a>
+        <a href="memory-model.html">?????? ???'???</a>
         <a href="two-pass-guide.html">Two Pass</a>
-        <a href="crypto-guide.html">Крипто</a>
-        <a href="recipes.html">Рецепти</a>
+        <a href="crypto-guide.html">??????</a>
+        <a href="recipes.html">???????</a>
         <a href="cpp-knowledge.html">C++ Knowledge</a>
-        <a href="source/index.html">Код</a>
+        <a href="source/index.html">???</a>
       </nav>
       <div class="lang-switch" aria-label="Language selector">
-        <a class="flag" href="../api-atlas.html" title="English" lang="en">🇬🇧</a>
-        <a class="flag active" href="api-atlas.html" title="Українська" lang="uk">🇺🇦</a>
+        <a class="flag" href="../api-atlas.html" title="English" lang="en">????</a>
+        <a class="flag active" href="api-atlas.html" title="??????????" lang="uk">????</a>
       </div>
     </div>
   </header>
 
   <main class="wrap">
     <section class="hero">
-      <h1>API Атлас</h1>
+      <h1>API ?????</h1>
       <p>
-        Якщо Module Map показує архітектуру, то Atlas показує контрактну карту:
-        які типи існують, що саме вони гарантують і як їх правильно комбінувати.
+        ???? Module Map ??????? ???????????, ?? Atlas ??????? ?????????? ?????:
+        ??? ???? ???????, ?? ???? ???? ?????????? ? ?? ?? ????????? ???????????.
       </p>
     </section>
 
@@ -66,8 +66,8 @@
         </tbody>
       </table>
       <p class="code-note">
-        <strong>Ментальна модель:</strong> <code>memory_req</code> описує, <code>layout</code> компонує,
-        <code>typed_scope</code> виконує.
+        <strong>????????? ??????:</strong> <code>memory_req</code> ??????, <code>layout</code> ????????,
+        <code>typed_scope</code> ???????.
       </p>
     </section>
 
@@ -76,55 +76,55 @@
       <div class="grid">
         <article class="card">
           <h3>Usability</h3>
-          <p class="muted"><code>active()</code> / <code>operator bool()</code> визначають, чи scope робочий. <code>init_status()</code> зберігає лише статус ініціалізації.</p>
+          <p class="muted"><code>active()</code> / <code>operator bool()</code> ??????????, ?? scope ???????. <code>init_status()</code> ???????? ???? ?????? ?????????????.</p>
         </article>
         <article class="card">
           <h3>Cleanup vs Close</h3>
-          <p class="muted"><code>destroy_all()</code> чистить об'єкти, але не закриває scope. <code>release()</code> закриває scope й робить його inert.</p>
+          <p class="muted"><code>destroy_all()</code> ??????? ??'????, ??? ?? ???????? scope. <code>release()</code> ???????? scope ? ?????? ???? inert.</p>
         </article>
         <article class="card">
           <h3>Type Safety</h3>
-          <p class="muted"><code>slot/get/construct/destroy</code> статично гарантують, що <code>T</code> належить <code>Layout</code>.</p>
+          <p class="muted"><code>slot/get/construct/destroy</code> ???????? ??????????, ?? <code>T</code> ???????? <code>Layout</code>.</p>
         </article>
         <article class="card">
           <h3>Nothrow Policy</h3>
-          <p class="muted">Для побудови в <code>typed_scope</code> компоненти мають бути nothrow-constructible і nothrow-destructible.</p>
+          <p class="muted">??? ???????? ? <code>typed_scope</code> ?????????? ????? ???? nothrow-constructible ? nothrow-destructible.</p>
         </article>
       </div>
       <p class="infobox">
-        <strong>Основний інваріант:</strong> якщо <code>active()==false</code>, scope не usable; inert-стан означає порожній constructed-state.
+        <strong>???????? ?????????:</strong> ???? <code>active()==false</code>, scope ?? usable; inert-???? ??????? ???????? constructed-state.
       </p>
     </section>
 
     <section class="section">
-      <h2>Контракти та Constrained Value-Типи</h2>
+      <h2>????????? ?? Constrained Value-????</h2>
       <table>
         <thead><tr><th>File</th><th>Main Surface</th><th>When to Use</th></tr></thead>
         <tbody>
-          <tr><td><code>a/profile.hpp</code></td><td><code>profile::level</code>, <code>preset</code>, <code>current_level</code></td><td>Вибір build-wide контрактного режиму (<code>strict</code>/<code>audit</code>/<code>lean</code>)</td></tr>
-          <tr><td><code>a/contract.hpp</code></td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>require_that</code>, <code>assume_verified</code>, <code>unreachable</code></td><td>Жорсткі hard-fail контракти для коректності</td></tr>
-          <tr><td><code>a/bounded.hpp</code></td><td><code>bounded</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td><td>Розміри/count/alignment як валідовані типи</td></tr>
+          <tr><td><code>a/profile.hpp</code></td><td><code>profile::level</code>, <code>preset</code>, <code>current_level</code></td><td>????? build-wide ???????????? ?????? (<code>strict</code>/<code>audit</code>/<code>lean</code>)</td></tr>
+          <tr><td><code>a/contract.hpp</code></td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>require_that</code>, <code>assume_verified</code>, <code>unreachable</code></td><td>??????? hard-fail ????????? ??? ???????????</td></tr>
+          <tr><td><code>a/bounded.hpp</code></td><td><code>bounded</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td><td>???????/count/alignment ?? ?????????? ????</td></tr>
         </tbody>
       </table>
       <ul>
-        <li><code>require</code>: передумови на межі API/caller.</li>
-        <li><code>require_that&lt;Tag&gt;</code>: runtime-перевірка з випуском proof-token.</li>
-        <li><code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code>: одноразове споживання proof-token у trusted path.</li>
-        <li>Trusted path у bounded-типах є internal-only конструюванням, а не шляхом обходу валідації user input.</li>
+        <li><code>require</code>: ?????????? ?? ???? API/caller.</li>
+        <li><code>require_that&lt;Tag&gt;</code>: runtime-????????? ? ???????? proof-token.</li>
+        <li><code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code>: ?????????? ?????????? proof-token ? trusted path.</li>
+        <li>Trusted path ? bounded-????? ? internal-only ??????????????, ? ?? ?????? ?????? ????????? user input.</li>
       </ul>
-      <p class="infobox"><strong>Дивись:</strong> <code>a/CONTRACTS.md</code> для коротких правил вибору.</p>
+      <p class="infobox"><strong>??????:</strong> <code>a/CONTRACTS.md</code> ??? ???????? ?????? ??????.</p>
     </section>
 
     <section class="section">
-      <h2>Lifecycle API за Наміром</h2>
+      <h2>Lifecycle API ?? ???????</h2>
       <table>
-        <thead><tr><th>Намір</th><th>API</th><th>Що це не робить</th></tr></thead>
+        <thead><tr><th>?????</th><th>API</th><th>?? ?? ?? ??????</th></tr></thead>
         <tbody>
-          <tr><td>Отримати raw storage для компонента</td><td><code>slot&lt;T&gt;()</code></td><td>Не запускає object lifetime</td></tr>
-          <tr><td>Запустити typed lifetime</td><td><code>construct&lt;T&gt;(...)</code></td><td>Не закриває scope автоматично</td></tr>
-          <tr><td>Завершити один об'єкт</td><td><code>destroy&lt;T&gt;()</code></td><td>Не закриває frame</td></tr>
-          <tr><td>Завершити всі сконструйовані об'єкти</td><td><code>destroy_all()</code></td><td>Не робить scope inert</td></tr>
-          <tr><td>Закрити frame і інертнути scope</td><td><code>release()</code></td><td>Не зберігає подальшу usable-роботу</td></tr>
+          <tr><td>???????? raw storage ??? ??????????</td><td><code>slot&lt;T&gt;()</code></td><td>?? ???????? object lifetime</td></tr>
+          <tr><td>????????? typed lifetime</td><td><code>construct&lt;T&gt;(...)</code></td><td>?? ???????? scope ???????????</td></tr>
+          <tr><td>????????? ???? ??'???</td><td><code>destroy&lt;T&gt;()</code></td><td>?? ???????? frame</td></tr>
+          <tr><td>????????? ??? ?????????????? ??'????</td><td><code>destroy_all()</code></td><td>?? ?????? scope inert</td></tr>
+          <tr><td>??????? frame ? ????????? scope</td><td><code>release()</code></td><td>?? ???????? ???????? usable-??????</td></tr>
         </tbody>
       </table>
     </section>
@@ -159,13 +159,13 @@
     </section>
 
     <section class="section">
-      <h2>Як Практично Користуватися Атласом</h2>
+      <h2>?? ????????? ????????????? ???????</h2>
       <ul>
-        <li>Під час імплементації: спочатку звір намір API з таблицями тут, потім пиши код.</li>
-        <li>Під час рев'ю: перевір, що нові символи не ламають уже зафіксовані інваріанти.</li>
-        <li>Під час дебагу: спочатку класифікуй порушення (precondition/invariant/lifetime), потім шукай точку поломки.</li>
+        <li>??? ??? ?????????????: ???????? ???? ????? API ? ????????? ???, ????? ???? ???.</li>
+        <li>??? ??? ???'?: ???????, ?? ???? ??????? ?? ??????? ??? ??????????? ??????????.</li>
+        <li>??? ??? ??????: ???????? ?????????? ????????? (precondition/invariant/lifetime), ????? ????? ????? ???????.</li>
       </ul>
-      <p>Для line-by-line звірки переходь у <a href="source/index.html">Source Reference</a>.</p>
+      <p>??? line-by-line ?????? ???????? ? <a href="source/index.html">Source Reference</a>.</p>
     </section>
 
     <footer class="foot">
@@ -194,54 +194,21 @@
   var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
   select.value = currentProject;
 
-  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
-  if (!suffix) suffix = 'index.html';
-
   var prefix = '/';
   if (projectIndex > 0) {
     prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
   }
 
-  function targetUrl(project, relativePath) {
-    var hash = window.location.hash || '';
-    var query = window.location.search || '';
-    return prefix + project + '/docs/' + relativePath + query + hash;
-  }
-
-  function fallbackUrl(project) {
-    var hash = window.location.hash || '';
-    var query = window.location.search || '';
-    return prefix + project + '/docs/index.html' + query + hash;
-  }
-
-  async function switchProject(project) {
-    var preferred = targetUrl(project, suffix);
-
-    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
-      window.location.href = preferred;
-      return;
-    }
-
-    try {
-      var res = await fetch(preferred, { method: 'HEAD' });
-      if (res && res.ok) {
-        window.location.href = preferred;
-        return;
-      }
-    } catch (e) {
-      // ignore and use fallback
-    }
-
-    window.location.href = fallbackUrl(project);
-  }
-
   select.addEventListener('change', function (e) {
-    switchProject(e.target.value);
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    window.location.href = prefix + e.target.value + '/docs/index.html' + query + hash;
   });
 })();
 </script>
 </body>
 </html>
+
 
 
 

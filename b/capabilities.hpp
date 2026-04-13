@@ -2,8 +2,20 @@
 
 #include "../a/config.hpp"
 
+#if defined(_WIN32)
+#  define B_OS_WINDOWS 1
+#else
+#  define B_OS_WINDOWS 0
+#endif
+
+#if defined(__linux__)
+#  define B_OS_LINUX 1
+#else
+#  define B_OS_LINUX 0
+#endif
+
 #ifndef B_HAS_THREADS
-#  if defined(_WIN32) || defined(__linux__)
+#  if (B_OS_WINDOWS || B_OS_LINUX)
 #    define B_HAS_THREADS 1
 #  else
 #    define B_HAS_THREADS 0
@@ -11,7 +23,7 @@
 #endif
 
 #ifndef B_HAS_TIME
-#  if defined(_WIN32) || defined(__linux__)
+#  if (B_OS_WINDOWS || B_OS_LINUX)
 #    define B_HAS_TIME 1
 #  else
 #    define B_HAS_TIME 0
@@ -19,15 +31,11 @@
 #endif
 
 #ifndef B_HAS_FILESYSTEM
-#  if defined(_WIN32) || defined(__linux__)
-#    define B_HAS_FILESYSTEM 1
-#  else
-#    define B_HAS_FILESYSTEM 0
-#  endif
+#  define B_HAS_FILESYSTEM 0
 #endif
 
 #ifndef B_HAS_SOCKETS
-#  if defined(_WIN32) || defined(__linux__)
+#  if (B_OS_WINDOWS || B_OS_LINUX)
 #    define B_HAS_SOCKETS 1
 #  else
 #    define B_HAS_SOCKETS 0
@@ -35,11 +43,7 @@
 #endif
 
 #ifndef B_HAS_WINDOWING
-#  if defined(_WIN32) || defined(__linux__)
-#    define B_HAS_WINDOWING 1
-#  else
-#    define B_HAS_WINDOWING 0
-#  endif
+#  define B_HAS_WINDOWING 0
 #endif
 
 namespace b {

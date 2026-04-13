@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="uk">
 <head>
   <meta charset="utf-8">
@@ -22,19 +22,19 @@
         <span class="brand-tail">module map</span>
       </div>
       <nav class="nav">
-        <a href="index.html">Огляд</a>
-        <a href="modules.html">Модулі</a>
-        <a href="api-atlas.html">API Атлас</a>
-        <a href="memory-model.html">Модель Пам'яті</a>
+        <a href="index.html">?????</a>
+        <a href="modules.html">??????</a>
+        <a href="api-atlas.html">API ?????</a>
+        <a href="memory-model.html">?????? ???'???</a>
         <a href="two-pass-guide.html">Two Pass</a>
-        <a href="crypto-guide.html">Крипто</a>
-        <a href="recipes.html">Рецепти</a>
+        <a href="crypto-guide.html">??????</a>
+        <a href="recipes.html">???????</a>
         <a href="cpp-knowledge.html">C++ Knowledge</a>
-        <a href="source/index.html">Код</a>
+        <a href="source/index.html">???</a>
       </nav>
       <div class="lang-switch" aria-label="Language selector">
-        <a class="flag" href="../modules.html" title="English" lang="en">🇬🇧</a>
-        <a class="flag active" href="modules.html" title="Українська" lang="uk">🇺🇦</a>
+        <a class="flag" href="../modules.html" title="English" lang="en">????</a>
+        <a class="flag active" href="modules.html" title="??????????" lang="uk">????</a>
       </div>
     </div>
   </header>
@@ -43,56 +43,56 @@
     <section class="hero">
       <h1>Module Map</h1>
       <p>
-        Цей розділ пояснює роль кожного публічного хедера у <code>a/</code>, напрямок залежностей
-        і правила, за якими варто розширювати кодову базу без архітектурного “дрейфу”.
+        ??? ?????? ??????? ???? ??????? ?????????? ?????? ? <code>a/</code>, ???????? ???????????
+        ? ???????, ?? ????? ????? ??????????? ?????? ???? ??? ?????????????? �??????�.
       </p>
     </section>
 
     <section class="section">
-      <h2>Як Читати Цю Карту</h2>
-      <p>Думай у двох осях:</p>
+      <h2>?? ?????? ?? ?????</h2>
+      <p>????? ? ???? ????:</p>
       <ul>
-        <li><strong>Шар:</strong> що має залишатися суворо чистим у <code>a</code>.</li>
-        <li><strong>Домен:</strong> memory, contracts, views, math, two-pass, crypto.</li>
+        <li><strong>???:</strong> ?? ??? ?????????? ?????? ?????? ? <code>a</code>.</li>
+        <li><strong>?????:</strong> memory, contracts, views, math, two-pass, crypto.</li>
       </ul>
       <p class="infobox">
-        <strong>Орієнтир:</strong> якщо хедер потребує OS-типів або прихованих алокацій, він не належить до <code>a</code>.
+        <strong>????????:</strong> ???? ????? ???????? OS-????? ??? ?????????? ????????, ??? ?? ???????? ?? <code>a</code>.
       </p>
     </section>
 
     <section class="section">
-      <h2>Core Headers (Публічна Поверхня)</h2>
+      <h2>Core Headers (???????? ????????)</h2>
       <table>
         <thead><tr><th>Header</th><th>Role</th><th>Main Surface</th></tr></thead>
         <tbody>
-          <tr><td><code>a/config.hpp</code></td><td>Feature-detection центр компілятора й архітектури</td><td>Macros: <code>A_COMPILER_*</code>, <code>A_ARCH_*</code>, <code>A_ENDIAN_*</code>, attributes/branch hints</td></tr>
-          <tr><td><code>a/profile.hpp</code></td><td>Профіль контрактної політики</td><td><code>profile::level</code>, <code>profile::preset</code>, глобальний <code>current_level</code></td></tr>
-          <tr><td><code>a/contract.hpp</code></td><td>Єдиний механізм контрактів</td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>require_that</code>, <code>assume_verified</code>, <code>unreachable</code></td></tr>
-          <tr><td><code>a/bounded.hpp</code></td><td>Constrained scalar value-типи</td><td><code>bounded&lt;T,Min,Max&gt;</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td></tr>
-          <tr><td><code>a/types.hpp</code></td><td>Базові fixed-width типи</td><td><code>u8..u64</code>, <code>i8..i64</code>, <code>usize/isize</code>, <code>u128</code>, <code>npos</code></td></tr>
-          <tr><td><code>a/status.hpp</code></td><td>Єдиний канал статусів</td><td><code>enum class status</code>, <code>is_ok()</code></td></tr>
-          <tr><td><code>a/memory_requirements.hpp</code></td><td>Алгебра вимог до пам'яті</td><td><code>memory_req</code>, <code>req_sum</code>, <code>req_max</code>, overflow/validation helpers</td></tr>
+          <tr><td><code>a/config.hpp</code></td><td>Feature-detection ????? ??????????? ? ???????????</td><td>Macros: <code>A_COMPILER_*</code>, <code>A_ARCH_*</code>, <code>A_ENDIAN_*</code>, attributes/branch hints</td></tr>
+          <tr><td><code>a/profile.hpp</code></td><td>??????? ??????????? ????????</td><td><code>profile::level</code>, <code>profile::preset</code>, ?????????? <code>current_level</code></td></tr>
+          <tr><td><code>a/contract.hpp</code></td><td>?????? ???????? ??????????</td><td><code>require</code>, <code>ensure</code>, <code>invariant</code>, <code>require_that</code>, <code>assume_verified</code>, <code>unreachable</code></td></tr>
+          <tr><td><code>a/bounded.hpp</code></td><td>Constrained scalar value-????</td><td><code>bounded&lt;T,Min,Max&gt;</code>, <code>pow2_bounded</code>, <code>static_bounded</code></td></tr>
+          <tr><td><code>a/types.hpp</code></td><td>?????? fixed-width ????</td><td><code>u8..u64</code>, <code>i8..i64</code>, <code>usize/isize</code>, <code>u128</code>, <code>npos</code></td></tr>
+          <tr><td><code>a/status.hpp</code></td><td>?????? ????? ????????</td><td><code>enum class status</code>, <code>is_ok()</code></td></tr>
+          <tr><td><code>a/memory_requirements.hpp</code></td><td>??????? ????? ?? ???'???</td><td><code>memory_req</code>, <code>req_sum</code>, <code>req_max</code>, overflow/validation helpers</td></tr>
           <tr><td><code>a/meta.hpp</code></td><td>Compile-time traits</td><td><code>enable_if</code>, <code>is_same</code>, <code>remove_reference</code>, nothrow traits</td></tr>
-          <tr><td><code>a/utility.hpp</code></td><td>Низькорівневі utility-побудови</td><td><code>len</code>, <code>move</code>, <code>forward</code>, <code>launder_ptr</code></td></tr>
-          <tr><td><code>a/view.hpp</code></td><td>Non-owning подання буферів</td><td><code>view</code>, <code>view_n</code>, <code>char_view</code>, <code>byte_view</code>, <code>as_view</code></td></tr>
+          <tr><td><code>a/utility.hpp</code></td><td>????????????? utility-????????</td><td><code>len</code>, <code>move</code>, <code>forward</code>, <code>launder_ptr</code></td></tr>
+          <tr><td><code>a/view.hpp</code></td><td>Non-owning ??????? ???????</td><td><code>view</code>, <code>view_n</code>, <code>char_view</code>, <code>byte_view</code>, <code>as_view</code></td></tr>
           <tr><td><code>a/utf8.hpp</code></td><td>UTF-8 literal helpers</td><td><code>u8view</code>, macro <code>A_U8(...)</code></td></tr>
-          <tr><td><code>a/math.hpp</code></td><td>Цілочисельна математика і conversion helpers</td><td><code>mul_u64</code>, <code>add_u128</code>, <code>div_u64_u32</code>, <code>f2u8</code>, <code>ceil</code></td></tr>
-          <tr><td><code>a/bit.hpp</code></td><td>Endian/bit інструменти</td><td><code>byteswap</code>, <code>rotl/rotr</code>, <code>load/store le/be</code>, <code>bitset&lt;N&gt;</code></td></tr>
-          <tr><td><code>a/charconv_base.hpp</code></td><td>Мінімальний charconv foundation</td><td><code>digit_floor_clamped_0_9</code>, <code>digit_to_u32_from_double_pos</code>, <code>digit_to_double</code></td></tr>
-          <tr><td><code>a/arena.hpp</code></td><td>Робота з arena і rollback frame</td><td><code>arena_view</code>, <code>alloc_result</code>, <code>scope</code></td></tr>
-          <tr><td><code>a/two_pass.hpp</code></td><td>Type-level композиція + typed scope</td><td><code>component_req</code>, <code>sum_req</code>, <code>layout</code>, <code>typed_scope</code>, <code>a::two_pass</code> wrappers</td></tr>
-          <tr><td><code>a/a.hpp</code></td><td>Єдиний umbrella include</td><td>Стабільний include-order для всього core</td></tr>
+          <tr><td><code>a/math.hpp</code></td><td>???????????? ?????????? ? conversion helpers</td><td><code>mul_u64</code>, <code>add_u128</code>, <code>div_u64_u32</code>, <code>f2u8</code>, <code>ceil</code></td></tr>
+          <tr><td><code>a/bit.hpp</code></td><td>Endian/bit ???????????</td><td><code>byteswap</code>, <code>rotl/rotr</code>, <code>load/store le/be</code>, <code>bitset&lt;N&gt;</code></td></tr>
+          <tr><td><code>a/charconv_base.hpp</code></td><td>??????????? charconv foundation</td><td><code>digit_floor_clamped_0_9</code>, <code>digit_to_u32_from_double_pos</code>, <code>digit_to_double</code></td></tr>
+          <tr><td><code>a/arena.hpp</code></td><td>?????? ? arena ? rollback frame</td><td><code>arena_view</code>, <code>alloc_result</code>, <code>scope</code></td></tr>
+          <tr><td><code>a/two_pass.hpp</code></td><td>Type-level ?????????? + typed scope</td><td><code>component_req</code>, <code>sum_req</code>, <code>layout</code>, <code>typed_scope</code>, <code>a::two_pass</code> wrappers</td></tr>
+          <tr><td><code>a/a.hpp</code></td><td>?????? umbrella include</td><td>?????????? include-order ??? ?????? core</td></tr>
         </tbody>
       </table>
       <p class="infobox">
-        <strong>Правило контрактів:</strong> межа API — це <code>require</code>; перевірка з видачею доказу —
-        <code>require_that&lt;Tag&gt;</code>; споживання доказу — <code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code>.
-        Дивись <code>a/CONTRACTS.md</code>.
+        <strong>??????? ??????????:</strong> ???? API � ?? <code>require</code>; ????????? ? ??????? ?????? �
+        <code>require_that&lt;Tag&gt;</code>; ?????????? ?????? � <code>assume_verified(proven&lt;Tag&gt;&amp;&amp;)</code>.
+        ?????? <code>a/CONTRACTS.md</code>.
       </p>
     </section>
 
     <section class="section">
-      <h2>Порядок Залежностей Усередині <code>a/</code></h2>
+      <h2>??????? ??????????? ????????? <code>a/</code></h2>
       <div class="code"><pre><code>config
   -> types
   -> meta / utility
@@ -101,7 +101,7 @@
   -> two_pass
   -> crypto</code></pre></div>
       <p class="code-note">
-        <strong>На пальцях:</strong> крипто будується поверх bit/load-store helpers, а не дублює низькорівневу логіку у кожному алгоритмі.
+        <strong>?? ???????:</strong> ?????? ????????? ?????? bit/load-store helpers, ? ?? ?????? ????????????? ?????? ? ??????? ?????????.
       </p>
     </section>
 
@@ -121,39 +121,39 @@
     </section>
 
     <section class="section">
-      <h2>Internal Headers (<code>detail/</code> Поверхня)</h2>
+      <h2>Internal Headers (<code>detail/</code> ????????)</h2>
       <div class="grid">
         <article class="card">
           <h3><code>a/detail/arch.hpp</code></h3>
-          <p class="muted">Внутрішні arch-tags і вибір <code>arch_default</code> для platform-specific fast paths. Тут має жити arch-специфіка, а не у публічному API.</p>
+          <p class="muted">????????? arch-tags ? ????? <code>arch_default</code> ??? platform-specific fast paths. ??? ??? ???? arch-?????????, ? ?? ? ?????????? API.</p>
         </article>
         <article class="card">
           <h3><code>a/crypto/detail/load_store.hpp</code></h3>
-          <p class="muted">Єдине місце LE/BE load-store логіки для криптомодулів поверх <code>a::bit</code>.</p>
+          <p class="muted">????? ????? LE/BE load-store ?????? ??? ????????????? ?????? <code>a::bit</code>.</p>
         </article>
         <article class="card">
           <h3><code>a/crypto/detail/ct.hpp</code></h3>
-          <p class="muted">Константно-часові порівняння: <code>ct_equal_n</code> і <code>ct_equal</code>, щоб уникати таймінгових витоків від раннього виходу.</p>
+          <p class="muted">??????????-?????? ??????????: <code>ct_equal_n</code> ? <code>ct_equal</code>, ??? ??????? ??????????? ??????? ??? ???????? ??????.</p>
         </article>
         <article class="card">
           <h3><code>a/crypto/detail/wipe.hpp</code></h3>
-          <p class="muted">Best-effort wipe для секретів через volatile byte loop; очищення має бути явною фазою, а не “можливо колись перезапишеться”.</p>
+          <p class="muted">Best-effort wipe ??? ???????? ????? volatile byte loop; ???????? ??? ???? ????? ?????, ? ?? �??????? ?????? ??????????????�.</p>
         </article>
       </div>
     </section>
 
     <section class="section">
-      <h2>Типові Помилки Розміщення</h2>
+      <h2>?????? ??????? ??????????</h2>
       <ul>
-        <li>Пхати scheduler/thread поведінку в <code>a</code> замість <code>b</code>.</li>
-        <li>Додавати API, які роблять hidden allocation.</li>
-        <li>Змішувати OS-wrapper логіку і protocol logic в одному модулі.</li>
-        <li>Виносити platform handles у portable публічні інтерфейси.</li>
+        <li>????? scheduler/thread ????????? ? <code>a</code> ??????? <code>b</code>.</li>
+        <li>???????? API, ??? ??????? hidden allocation.</li>
+        <li>????????? OS-wrapper ?????? ? protocol logic ? ?????? ??????.</li>
+        <li>???????? platform handles ? portable ???????? ??????????.</li>
       </ul>
     </section>
 
     <footer class="foot">
-      Модульна карта для всього <code>a/</code>.
+      ???????? ????? ??? ?????? <code>a/</code>.
     </footer>
   </main>
 <script id="project-switch-script">
@@ -178,54 +178,21 @@
   var currentProject = projectIndex >= 0 ? segments[projectIndex] : 'a';
   select.value = currentProject;
 
-  var suffix = projectIndex >= 0 ? segments.slice(projectIndex + 2).join('/') : 'index.html';
-  if (!suffix) suffix = 'index.html';
-
   var prefix = '/';
   if (projectIndex > 0) {
     prefix = '/' + segments.slice(0, projectIndex).join('/') + '/';
   }
 
-  function targetUrl(project, relativePath) {
-    var hash = window.location.hash || '';
-    var query = window.location.search || '';
-    return prefix + project + '/docs/' + relativePath + query + hash;
-  }
-
-  function fallbackUrl(project) {
-    var hash = window.location.hash || '';
-    var query = window.location.search || '';
-    return prefix + project + '/docs/index.html' + query + hash;
-  }
-
-  async function switchProject(project) {
-    var preferred = targetUrl(project, suffix);
-
-    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') {
-      window.location.href = preferred;
-      return;
-    }
-
-    try {
-      var res = await fetch(preferred, { method: 'HEAD' });
-      if (res && res.ok) {
-        window.location.href = preferred;
-        return;
-      }
-    } catch (e) {
-      // ignore and use fallback
-    }
-
-    window.location.href = fallbackUrl(project);
-  }
-
   select.addEventListener('change', function (e) {
-    switchProject(e.target.value);
+    var hash = window.location.hash || '';
+    var query = window.location.search || '';
+    window.location.href = prefix + e.target.value + '/docs/index.html' + query + hash;
   });
 })();
 </script>
 </body>
 </html>
+
 
 
 

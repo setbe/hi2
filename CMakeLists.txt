@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 project(abcd LANGUAGES CXX)
 
 option(LEGACY_CPP14 "Use legacy C++14 compiler (default ON)" ON)
-option(ABCD_BUILD_TESTS "Build tests for layer a" ON)
+option(ABCD_BUILD_TESTS "Build tests for layers a and b" ON)
 
 if(LEGACY_CPP14)
     set(CMAKE_CXX_STANDARD 14)
@@ -27,15 +27,44 @@ function(abcd_add_header_only target layer_dir)
 endfunction()
 
 # -----------------------------------------------------------------------------
-# Header-only layer targets
+# Layer targets
 # -----------------------------------------------------------------------------
 
 abcd_add_header_only(a_layer a)
-abcd_add_header_only(b_layer b)
+
+file(GLOB_RECURSE b_headers CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/b/*.hpp"
+)
+
+set(b_sources
+    ${CMAKE_SOURCE_DIR}/b/time.cpp
+    ${CMAKE_SOURCE_DIR}/b/thread.cpp
+    ${CMAKE_SOURCE_DIR}/b/net/socket.cpp
+)
+
+if(WIN32)
+    list(APPEND b_sources
+        ${CMAKE_SOURCE_DIR}/b/ports/windows/time.cpp
+        ${CMAKE_SOURCE_DIR}/b/ports/windows/thread.cpp
+        ${CMAKE_SOURCE_DIR}/b/ports/windows/socket.cpp
+    )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND b_sources
+        ${CMAKE_SOURCE_DIR}/b/ports/linux/time.cpp
+        ${CMAKE_SOURCE_DIR}/b/ports/linux/thread.cpp
+        ${CMAKE_SOURCE_DIR}/b/ports/linux/socket.cpp
+    )
+endif()
+
+add_library(b_layer STATIC ${b_sources} ${b_headers})
+target_include_directories(b_layer PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+)
+target_link_libraries(b_layer PUBLIC a_layer)
+
 abcd_add_header_only(c_layer c)
 abcd_add_header_only(d_layer d)
 
-target_link_libraries(b_layer INTERFACE a_layer)
 target_link_libraries(c_layer INTERFACE a_layer b_layer)
 target_link_libraries(d_layer INTERFACE a_layer b_layer c_layer)
 
@@ -62,6 +91,21 @@ if(ABCD_BUILD_TESTS)
     if(BUILD_TESTING)
         add_test(NAME a.compiletime COMMAND test_a_compiletime)
         add_test(NAME a.runtime COMMAND test_a_runtime)
+    endif()
+
+    add_executable(test_b_compiletime
+        examples/tests/b/test_b_compiletime.cpp
+    )
+    target_link_libraries(test_b_compiletime PRIVATE b_layer)
+
+    add_executable(test_b_runtime
+        examples/tests/b/test_b_runtime.cpp
+    )
+    target_link_libraries(test_b_runtime PRIVATE b_layer)
+
+    if(BUILD_TESTING)
+        add_test(NAME b.compiletime COMMAND test_b_compiletime)
+        add_test(NAME b.runtime COMMAND test_b_runtime)
     endif()
 endif()
 
